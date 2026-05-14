@@ -73,7 +73,6 @@ const path = Astro.url.pathname;
         <div class="nav-links" id="navLinks">
           <a href="/"            data-nav="" class={`nav-link${path === '/' ? ' active' : ''}`}>All Jobs</a>
           <a href="/remote"      target="_blank" rel="noopener" class={`nav-link${path.startsWith('/remote') ? ' active' : ''}`}>Remote</a>
-          <a href="/urgent"      target="_blank" rel="noopener" class={`nav-link${path.startsWith('/urgent') ? ' active' : ''}`}>Urgent</a>
           <a href="/internships" target="_blank" rel="noopener" class={`nav-link${path.startsWith('/internships') ? ' active' : ''}`}>Internships</a>
         </div>
 
@@ -89,7 +88,6 @@ const path = Astro.url.pathname;
       <div class="nav-drawer" id="navDrawer">
         <a href="/"            data-nav=""                         class="drawer-link">All Jobs</a>
         <a href="/remote"      target="_blank" rel="noopener"      class="drawer-link">Remote</a>
-        <a href="/urgent"      target="_blank" rel="noopener"      class="drawer-link">Urgent</a>
         <a href="/internships" target="_blank" rel="noopener"      class="drawer-link">Internships</a>
       </div>
     </nav>

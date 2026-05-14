@@ -24,9 +24,6 @@ const jobs: Job[] = entries
     category:   e.data.category,
   }));
 
-// Ticker: actual job titles
-const tickerStr = jobs.map((j) => `${j.title} @ ${j.company}`).join(' &nbsp;&nbsp;·&nbsp;&nbsp; ') + ' &nbsp;&nbsp;·&nbsp;&nbsp; ';
-
 // JSON-LD
 const jsonLd = JSON.stringify({
   "@context": "https://schema.org",
@@ -47,14 +44,6 @@ const jsonLd = JSON.stringify({
   description="Find remote and on-site engineering jobs. Updated daily. Terminal-style job board."
 >
   <script slot="head" type="application/ld+json" is:inline set:html={jsonLd} />
-
-  <!-- ── Ticker ────────────────────────────────────────── -->
-  <div class="ticker-wrap" aria-hidden="true">
-    <div class="ticker-track">
-      <span class="ticker-content" set:html={tickerStr} />
-      <span class="ticker-content" set:html={tickerStr} aria-hidden="true" />
-    </div>
-  </div>
 
   <!-- ── Hero ──────────────────────────────────────────── -->
   <section class="hero">

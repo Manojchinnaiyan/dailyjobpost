@@ -133,24 +133,6 @@ const jobLdStr = JSON.stringify(jobLd);
 
         <div class="detail-divider">─────────────────────────────────────────────────────</div>
 
-        <!-- Apply button -->
-        {d.applyUrl ? (
-          <div class="detail-apply-row">
-            <a
-              href={d.applyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-primary detail-apply-btn"
-            >
-              [ APPLY_NOW → ]
-            </a>
-            <span class="detail-apply-hint">opens the company's application page</span>
-          </div>
-        ) : (
-          <div class="detail-apply-row">
-            <span class="detail-no-apply">no direct apply link — contact {d.company} directly</span>
-          </div>
-        )}
 
       </div>
     </div>
