@@ -6,3 +6,4 @@ export default defineConfig({
   integrations: [preact()],
   site: 'https://dailyjobpost.online',
 });
+
