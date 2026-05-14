@@ -1,0 +1,70 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import JobList from '../components/JobList';
+import type { Job } from '../components/JobList';
+
+const entries = await getCollection('jobs');
+
+const jobs: Job[] = entries
+  .sort((a, b) => b.data.posted.getTime() - a.data.posted.getTime())
+  .map((e) => ({
+    slug:       e.slug,
+    title:      e.data.title,
+    company:    e.data.company,
+    location:   e.data.location,
+    type:       e.data.type,
+    remote:     e.data.remote,
+    urgent:     e.data.urgent,
+    salary:     e.data.salary,
+    tags:       e.data.tags,
+    posted:     e.data.posted.toISOString(),
+    applyUrl:   e.data.applyUrl,
+    experience: e.data.experience,
+    category:   e.data.category,
+  }));
+
+const internCount = jobs.filter(j => j.type === 'internship').length;
+---
+
+<Base
+  title="Engineering Internships — dailyjobpost.online"
+  description={`${internCount} engineering internship${internCount !== 1 ? 's' : ''}. Start your career. Find internship roles on dailyjobpost.online.`}
+>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <div class="page-header-inner">
+      <a href="/" class="back-link">← ALL_JOBS</a>
+      <h1 class="page-header-title">▶ INTERNSHIPS</h1>
+      <p class="page-header-sub">{internCount} engineering internship{internCount !== 1 ? 's' : ''} · start your career</p>
+    </div>
+  </div>
+
+  <!-- Job listing -->
+  <div class="jobs-section">
+    <JobList jobs={jobs} client:load withSearch initialTypeFilter="internship" />
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <span class="nav-logo-icon">$_</span>
+        <span class="nav-logo-text">DAILYJOBPOST.ONLINE</span>
+      </div>
+      <div class="footer-links">
+        <a href="/">Jobs</a>
+        <a href="/">About</a>
+        <a href="/">Privacy</a>
+      </div>
+      <div class="footer-status">
+        <span style="color: var(--green);">[OK]</span> ALL SYSTEMS OPERATIONAL
+      </div>
+    </div>
+    <div class="footer-copy">
+      data is static · rebuilt on every github push · no trackers · no cookies · dailyjobpost.online v2.1
+    </div>
+  </footer>
+
+</Base>

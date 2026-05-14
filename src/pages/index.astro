@@ -1,0 +1,198 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import JobList from '../components/JobList';
+import type { Job } from '../components/JobList';
+
+const entries = await getCollection('jobs');
+
+const jobs: Job[] = entries
+  .sort((a, b) => b.data.posted.getTime() - a.data.posted.getTime())
+  .map((e) => ({
+    slug:       e.slug,
+    title:      e.data.title,
+    company:    e.data.company,
+    location:   e.data.location,
+    type:       e.data.type,
+    remote:     e.data.remote,
+    urgent:     e.data.urgent,
+    salary:     e.data.salary,
+    tags:       e.data.tags,
+    posted:     e.data.posted.toISOString(),
+    applyUrl:   e.data.applyUrl,
+    experience: e.data.experience,
+    category:   e.data.category,
+  }));
+
+// Ticker: actual job titles
+const tickerStr = jobs.map((j) => `${j.title} @ ${j.company}`).join(' &nbsp;&nbsp;·&nbsp;&nbsp; ') + ' &nbsp;&nbsp;·&nbsp;&nbsp; ';
+
+// JSON-LD
+const jsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "dailyjobpost.online",
+  "url": "https://dailyjobpost.online",
+  "description": "Find remote and on-site engineering jobs. Updated daily.",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": { "@type": "EntryPoint", "urlTemplate": "https://dailyjobpost.online/?q={search_term_string}" },
+    "query-input": "required name=search_term_string"
+  }
+});
+---
+
+<Base
+  title="dailyjobpost.online — Find Engineering Jobs"
+  description="Find remote and on-site engineering jobs. Updated daily. Terminal-style job board."
+>
+  <script slot="head" type="application/ld+json" is:inline set:html={jsonLd} />
+
+  <!-- ── Ticker ────────────────────────────────────────── -->
+  <div class="ticker-wrap" aria-hidden="true">
+    <div class="ticker-track">
+      <span class="ticker-content" set:html={tickerStr} />
+      <span class="ticker-content" set:html={tickerStr} aria-hidden="true" />
+    </div>
+  </div>
+
+  <!-- ── Hero ──────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-layout">
+
+      <!-- LEFT — copy + quick chips ───────────────────── -->
+      <div class="hero-left">
+        <p class="hero-eyebrow">engineering job board</p>
+
+        <h1 class="hero-title">
+          Find Your<br />
+          <span class="hero-title-accent">Dream Job</span><span class="hero-cursor">_</span>
+        </h1>
+
+        <p class="hero-sub">
+          Remote &amp; on-site engineering roles from top companies.
+          Filter by role, salary, and experience level.
+        </p>
+
+        <form class="hero-search" id="heroForm" action="#jobs">
+          <span class="hero-prompt">$</span>
+          <input
+            id="heroQ"
+            class="hero-input"
+            type="text"
+            placeholder="Search job title, skill, or company..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <span class="hero-cursor-inline"></span>
+          <button type="submit" class="hero-search-btn btn btn-primary">
+            [ SEARCH ]
+          </button>
+        </form>
+
+        <div class="hero-popular">
+          <span class="popular-label">try:</span>
+          <a href="#jobs" class="popular-tag" data-search="Go">Go</a>
+          <a href="#jobs" class="popular-tag" data-search="Python">Python</a>
+          <a href="#jobs" class="popular-tag" data-search="React">React</a>
+          <a href="#jobs" class="popular-tag" data-search="Swift">Swift</a>
+          <a href="#jobs" class="popular-tag" data-search="remote">Remote</a>
+          <a href="#jobs" class="popular-tag" data-search="urgent">Urgent</a>
+        </div>
+      </div>
+
+      <!-- RIGHT — terminal window ──────────────────────── -->
+      <div class="hero-right" aria-hidden="true">
+        <div class="term-win">
+          <div class="term-win-bar">
+            <div class="term-win-dots">
+              <span class="term-dot term-dot--red"></span>
+              <span class="term-dot term-dot--amber"></span>
+              <span class="term-dot term-dot--green"></span>
+            </div>
+            <span class="term-win-title">dailyjobpost — bash</span>
+          </div>
+          <div class="term-win-body">
+            <div class="term-row term-row--cmd">
+              <span class="term-ps1">user@dailyjobpost:~$</span>
+              <span class="term-cmd-text"> query --all --sort=latest</span>
+            </div>
+            <div class="term-row term-row--info">fetching opportunities...</div>
+            <div class="term-spacer"></div>
+
+            {jobs.slice(0, 5).map((job, i) => (
+              <div class={`term-row term-job term-job--${i}`}>
+                <span class="term-job-idx">[{String(i + 1).padStart(2, '0')}]</span>
+                <span class="term-job-detail">
+                  <span class="term-job-title">{job.title}</span>
+                  <span class="term-job-meta">
+                    {job.company}
+                    {(job.remote || job.type === 'remote') ? ' · REMOTE' : ` · ${job.location}`}
+                    {job.salary ? ` · ${job.salary}` : ''}
+                  </span>
+                </span>
+              </div>
+            ))}
+
+            <div class="term-spacer"></div>
+            <div class="term-row term-row--info term-result">
+              {jobs.length} results found · all systems [OK]
+            </div>
+            <div class="term-row term-row--cmd">
+              <span class="term-ps1">user@dailyjobpost:~$</span>
+              <span class="term-blink">▋</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Job listings ───────────────────────────────────── -->
+  <div id="jobs" class="jobs-section">
+    <JobList jobs={jobs} client:load />
+  </div>
+
+  <!-- ── Email alert section ───────────────────────────── -->
+  <section class="alert-section">
+    <div class="alert-inner">
+      <div class="pane">
+        <div class="pane-header">▶ JOB_ALERTS // NEVER_MISS_A_ROLE</div>
+        <div class="alert-body">
+          <div class="alert-copy">
+            <div class="alert-title">get notified of new jobs</div>
+            <div class="alert-sub">Weekly digest of the latest engineering roles. No spam. Unsubscribe anytime.</div>
+          </div>
+          <form class="alert-form" onsubmit="return false" aria-label="Subscribe to job alerts">
+            <span class="alert-prompt">$</span>
+            <input type="email" class="alert-input" placeholder="your@email.com" autocomplete="email" aria-label="Email address" />
+            <button type="submit" class="btn btn-primary">[ SUBSCRIBE ]</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <span class="nav-logo-icon">$_</span>
+        <span class="nav-logo-text">DAILYJOBPOST.ONLINE</span>
+      </div>
+      <div class="footer-links">
+        <a href="/">Jobs</a>
+        <a href="/">About</a>
+        <a href="/">Privacy</a>
+      </div>
+      <div class="footer-status">
+        <span style="color: var(--green);">[OK]</span> ALL SYSTEMS OPERATIONAL
+      </div>
+    </div>
+    <div class="footer-copy">
+      data is static · rebuilt on every github push · no trackers · no cookies · dailyjobpost.online v2.1
+    </div>
+  </footer>
+
+</Base>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx astro:*)",
+      "Bash(curl -s http://localhost:4321/)",
+      "Bash(pkill -f \"astro preview\")",
+      "WebFetch(domain:jobsworld.in)",
+      "Bash(grep -l \"remote: true\" /Users/manoj/Desktop/Manoj/joblisting-terminal/src/content/jobs/*.md)",
+      "Bash(grep -h \"^salary:\\\\|^experience:\\\\|^tags:\\\\|^type:\" /Users/manoj/Desktop/Manoj/joblisting-terminal/src/content/jobs/*.md)",
+      "WebFetch(domain:www.jobfound.org)"
+    ]
+  }
+}

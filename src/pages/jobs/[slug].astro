@@ -1,0 +1,193 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+export async function getStaticPaths() {
+  const jobs = await getCollection('jobs');
+  return jobs.map((job) => ({
+    params: { slug: job.slug },
+    props:  { job },
+  }));
+}
+
+const { job } = Astro.props;
+const { Content } = await job.render();
+
+const d = job.data;
+
+function initials(company: string): string {
+  return company
+    .split(/[\s\-_]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0].toUpperCase())
+    .join('');
+}
+
+function daysAgo(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (diff === 0) return 'today';
+  if (diff === 1) return '1d ago';
+  return `${diff}d ago`;
+}
+
+const typeLabel = d.type.toUpperCase().replace('-', '_');
+
+const employmentTypeMap: Record<string, string> = {
+  'full-time':  'FULL_TIME',
+  'part-time':  'PART_TIME',
+  'contract':   'CONTRACTOR',
+  'remote':     'FULL_TIME',
+  'internship': 'INTERN',
+};
+
+const jobLd: Record<string, unknown> = {
+  "@context": "https://schema.org",
+  "@type": "JobPosting",
+  "title": d.title,
+  "description": `${d.title} at ${d.company}. ${d.location}. ${d.salary ?? ''}`,
+  "datePosted": d.posted.toISOString().split('T')[0],
+  "hiringOrganization": { "@type": "Organization", "name": d.company },
+  "jobLocation": {
+    "@type": "Place",
+    "address": { "@type": "PostalAddress", "addressLocality": d.location, "addressCountry": "US" }
+  },
+  "employmentType": employmentTypeMap[d.type] ?? 'OTHER',
+  "url": `https://dailyjobpost.online/jobs/${job.slug}`,
+};
+if (d.remote || d.type === 'remote') {
+  jobLd["jobLocationType"] = "TELECOMMUTE";
+  (jobLd["applicantLocationRequirements"] as unknown) = { "@type": "Country", "name": "United States" };
+}
+if (d.applyUrl) jobLd["url"] = d.applyUrl;
+
+const jobLdStr = JSON.stringify(jobLd);
+---
+
+<Base
+  title={`${d.title} @ ${d.company} — dailyjobpost.online`}
+  description={`${d.title} at ${d.company}. ${d.location}. ${d.salary ?? ''}. Apply now on dailyjobpost.online.`}
+>
+  <script slot="head" type="application/ld+json" is:inline set:html={jobLdStr} />
+
+  <div class="detail-wrap">
+
+    <!-- Back link -->
+    <a href="/" class="back-link">← BACK_TO_JOBS</a>
+
+    <!-- ── Job header card ─────────────────────────────────── -->
+    <div class="detail-card">
+
+      <div class="detail-card-hdr">
+        <span>▶ JOB_POSTING // {typeLabel}{d.remote || d.type === 'remote' ? ' // REMOTE' : ''}</span>
+        {d.urgent && <span class="hdr-urgent">[URGENT_HIRE]</span>}
+      </div>
+
+      <div class="detail-card-body">
+
+        <!-- Company + title row -->
+        <div class="detail-top">
+          <div class={`detail-logo${d.urgent ? ' detail-logo--urgent' : ''}`}>
+            {initials(d.company)}
+          </div>
+          <div class="detail-top-text">
+            <h1 class="detail-title">{d.title}</h1>
+            <div class="detail-company">{d.company}</div>
+            <div class="detail-posted">posted {daysAgo(d.posted)}</div>
+          </div>
+        </div>
+
+        <div class="detail-divider">─────────────────────────────────────────────────────</div>
+
+        <!-- Badges -->
+        <div class="detail-badges">
+          <span class="badge badge--ok">{typeLabel}</span>
+          {d.urgent  && <span class="badge badge--warn">URGENT</span>}
+          {(d.remote || d.type === 'remote') && <span class="badge badge--ok">REMOTE</span>}
+        </div>
+
+        <!-- Meta grid -->
+        <div class="detail-meta-grid">
+          <div class="detail-meta-item">
+            <span class="detail-meta-lbl">LOCATION</span>
+            <span class="detail-meta-val">&#x1F4CD; {d.location}</span>
+          </div>
+          {d.salary && (
+            <div class="detail-meta-item">
+              <span class="detail-meta-lbl">SALARY</span>
+              <span class="detail-meta-val detail-salary">{d.salary}</span>
+            </div>
+          )}
+          {d.experience && (
+            <div class="detail-meta-item">
+              <span class="detail-meta-lbl">EXPERIENCE</span>
+              <span class="detail-meta-val">{d.experience}</span>
+            </div>
+          )}
+        </div>
+
+        <!-- Tags -->
+        <div class="job-tags">
+          {d.tags.map((tag: string) => <span class="job-tag">{tag}</span>)}
+        </div>
+
+        <div class="detail-divider">─────────────────────────────────────────────────────</div>
+
+        <!-- Apply button -->
+        {d.applyUrl ? (
+          <div class="detail-apply-row">
+            <a
+              href={d.applyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-primary detail-apply-btn"
+            >
+              [ APPLY_NOW → ]
+            </a>
+            <span class="detail-apply-hint">opens the company's application page</span>
+          </div>
+        ) : (
+          <div class="detail-apply-row">
+            <span class="detail-no-apply">no direct apply link — contact {d.company} directly</span>
+          </div>
+        )}
+
+      </div>
+    </div>
+
+    <!-- ── Job description ─────────────────────────────────── -->
+    <div class="detail-desc">
+      <div class="detail-desc-hdr">▶ JOB_DESCRIPTION</div>
+      <div class="detail-divider" style="margin-top: 0;">
+        ──────────────────────────────────────────────────────────────
+      </div>
+      <div class="md-content">
+        <Content />
+      </div>
+    </div>
+
+    <!-- ── Bottom apply CTA ───────────────────────────────── -->
+    {d.applyUrl ? (
+      <div class="detail-apply-bottom">
+        <span class="detail-apply-bottom-lbl">READY TO APPLY? DON'T MISS THIS OPPORTUNITY.</span>
+        <a
+          href={d.applyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="detail-apply-cta"
+        >
+          [ APPLY_NOW → ]
+        </a>
+      </div>
+    ) : (
+      <div class="detail-apply-bottom">
+        <span class="detail-apply-bottom-lbl">no direct apply link — contact {d.company} directly</span>
+      </div>
+    )}
+
+    <!-- Back link bottom -->
+    <a href="/" class="back-link" style="margin-top: 8px; display: inline-block;">← BACK_TO_JOBS</a>
+
+  </div>
+
+</Base>

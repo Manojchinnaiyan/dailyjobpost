@@ -1,0 +1,165 @@
+---
+import '../styles/global.css';
+
+export interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title       = 'dailyjobpost.online — Find Your Dream Job',
+  description = 'Discover remote & on-site engineering jobs. Terminal-style job board. Updated daily.',
+} = Astro.props;
+
+const path = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <!-- Canonical -->
+    <link rel="canonical" href={Astro.url.href} />
+    <!-- Open Graph -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:url"         content={Astro.url.href} />
+    <meta property="og:title"       content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:site_name"   content="dailyjobpost.online" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary" />
+    <meta name="twitter:title"       content={title} />
+    <meta name="twitter:description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <slot name="head" />
+    <!-- Prevent flash of wrong theme -->
+    <script is:inline>
+      (function() {
+        var stored = localStorage.getItem('theme');
+        if (stored === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else if (!stored && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!--  NAVBAR                                                -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <nav class="navbar">
+      <div class="nav-inner">
+
+        <!-- Logo -->
+        <a href="/" class="nav-logo">
+          <span class="nav-logo-icon">$_</span>
+          <span class="nav-logo-text">DAILYJOBPOST</span>
+        </a>
+
+        <!-- Desktop links -->
+        <div class="nav-links" id="navLinks">
+          <a href="/"            data-nav="" class={`nav-link${path === '/' ? ' active' : ''}`}>All Jobs</a>
+          <a href="/remote"      target="_blank" rel="noopener" class={`nav-link${path.startsWith('/remote') ? ' active' : ''}`}>Remote</a>
+          <a href="/urgent"      target="_blank" rel="noopener" class={`nav-link${path.startsWith('/urgent') ? ' active' : ''}`}>Urgent</a>
+          <a href="/internships" target="_blank" rel="noopener" class={`nav-link${path.startsWith('/internships') ? ' active' : ''}`}>Internships</a>
+        </div>
+
+        <!-- Right side -->
+        <div class="nav-right">
+          <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark theme" title="Toggle theme">◐</button>
+          <button class="nav-toggle" id="navToggle" aria-label="Open menu">&#9776;</button>
+        </div>
+
+      </div>
+
+      <!-- Mobile drawer -->
+      <div class="nav-drawer" id="navDrawer">
+        <a href="/"            data-nav=""                         class="drawer-link">All Jobs</a>
+        <a href="/remote"      target="_blank" rel="noopener"      class="drawer-link">Remote</a>
+        <a href="/urgent"      target="_blank" rel="noopener"      class="drawer-link">Urgent</a>
+        <a href="/internships" target="_blank" rel="noopener"      class="drawer-link">Internships</a>
+      </div>
+    </nav>
+
+    <slot />
+
+    <!-- Back to top -->
+    <button id="btt" class="back-to-top" aria-label="Back to top">↑</button>
+
+    <script>
+      /* ── Theme toggle ──────────────────────────────────── */
+      (function () {
+        const btn = document.getElementById('themeToggle');
+        function applyTheme(light: boolean, save = true) {
+          if (light) {
+            document.documentElement.setAttribute('data-theme', 'light');
+            if (save) localStorage.setItem('theme', 'light');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+            if (save) localStorage.setItem('theme', 'dark');
+          }
+        }
+        btn?.addEventListener('click', () => {
+          const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+          applyTheme(!isLight);
+        });
+        /* Follow system theme changes when user has no stored preference */
+        const mq = window.matchMedia('(prefers-color-scheme: light)');
+        mq.addEventListener('change', (e) => {
+          if (!localStorage.getItem('theme')) applyTheme(e.matches, false);
+        });
+      })();
+
+      /* ── Mobile toggle ─────────────────────────────────── */
+      document.getElementById('navToggle')?.addEventListener('click', () => {
+        document.getElementById('navDrawer')?.classList.toggle('open');
+      });
+
+      /* ── Hero search form ──────────────────────────────── */
+      document.getElementById('heroForm')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const q = (document.getElementById('heroQ') as HTMLInputElement)?.value.trim() || '';
+        if (q) {
+          window.dispatchEvent(new CustomEvent('hero-search', { detail: { q } }));
+          document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+
+      /* ── Popular chips & nav filter links ──────────────── */
+      document.querySelectorAll('[data-search], [data-nav]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          const raw = (el as HTMLElement).dataset.search ?? (el as HTMLElement).dataset.nav ?? '';
+          const q = raw.trim();
+          window.dispatchEvent(new CustomEvent('hero-search', { detail: { q } }));
+          if (window.location.pathname !== '/') {
+            window.location.href = q ? '/?q=' + encodeURIComponent(q) : '/';
+            return;
+          }
+          document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth' });
+        });
+      });
+
+      /* ── Back to top ──────────────────────────────────── */
+      const btt = document.getElementById('btt');
+      window.addEventListener('scroll', () => {
+        btt?.classList.toggle('visible', window.scrollY > 400);
+      }, { passive: true });
+      btt?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    </script>
+
+  </body>
+</html>
