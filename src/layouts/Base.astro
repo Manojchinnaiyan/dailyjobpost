@@ -63,6 +63,9 @@ const path = Astro.url.pathname;
         // Publishable ingestion (write) key — safe to ship in the browser bundle.
         apiKey: 'amp_ecb35af15911cb441936a55751956ce5604c95883ddfc4eb518590a39310aefe',
         serverUrl: 'https://ingest.inspectuser.com',
+        // Session replay: record all sessions, inputs masked (PII-safe). rrweb is
+        // bundled in the SDK; chunks upload to the /replay endpoint on the API host.
+        sessionReplay: { enabled: true, serverUrl: 'https://api.inspectuser.com' },
       });
     </script>
   </head>
