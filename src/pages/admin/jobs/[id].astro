@@ -1,0 +1,160 @@
+---
+export const prerender = false;
+import { SESSION_COOKIE, getSession } from '../../../lib/auth';
+import { rowToJob, type JobRow } from '../../../lib/db';
+
+const { env } = Astro.locals.runtime;
+const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
+const session = await getSession(env.DB, sid);
+if (!session) return Astro.redirect('/admin/login');
+
+const { id } = Astro.params;
+const row = await env.DB.prepare('SELECT * FROM jobs WHERE id = ?').bind(id).first<JobRow>();
+if (!row) return Astro.redirect('/admin/dashboard');
+
+const job = rowToJob(row);
+const error = Astro.url.searchParams.get('error');
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edit Job — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+    body { background: #0a0a0a; color: #33ff00; font-family: 'JetBrains Mono', monospace; font-size: 13px; min-height: 100vh; }
+    .topbar { background: #1f521f; color: #0a0a0a; padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 1px; font-weight: 700; }
+    .topbar a { color: #0a0a0a; text-decoration: none; }
+    .topbar a:hover { text-decoration: underline; }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px; }
+    .page-title { font-size: 14px; font-weight: 700; text-shadow: 0 0 6px rgba(51,255,0,0.45); margin-bottom: 4px; }
+    .divider { color: #1f521f; font-size: 11px; margin: 16px 0 20px; letter-spacing: 1px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 10px; letter-spacing: 2px; color: #3a7a3a; }
+    input, select, textarea { background: #0d0d0d; border: 1px solid #1f521f; color: #33ff00; font-family: inherit; font-size: 12px; padding: 7px 10px; width: 100%; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: #33ff00; }
+    select option { background: #0a0a0a; }
+    textarea { resize: vertical; min-height: 220px; line-height: 1.6; }
+    .check-row { display: flex; align-items: center; gap: 8px; }
+    input[type="checkbox"] { width: auto; accent-color: #33ff00; }
+    .form-actions { display: flex; gap: 12px; align-items: center; margin-top: 24px; flex-wrap: wrap; }
+    .btn { background: transparent; border: 1px solid #3a7a3a; color: #3a7a3a; font-family: inherit; font-size: 11px; padding: 8px 20px; cursor: pointer; letter-spacing: 1px; text-decoration: none; display: inline-block; }
+    .btn:hover, .btn.primary { background: #33ff00; color: #0a0a0a; border-color: #33ff00; }
+    .btn.danger:hover { background: #ff3333; color: #fff; border-color: #ff3333; }
+    .error { color: #ff3333; font-size: 11px; letter-spacing: 1px; }
+    .hint { font-size: 10px; color: #3a7a3a; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <span>▶ EDIT_JOB #{job.id} // <a href="/admin/dashboard">← BACK</a></span>
+    <span>{session.email}</span>
+  </div>
+
+  <div class="wrap">
+    <div class="page-title">EDIT_JOB_POSTING</div>
+    <div style="font-size:11px;color:#3a7a3a;margin-top:2px">slug: {job.slug}</div>
+
+    {error && <div class="error" style="margin-top:12px">[ERR] Title, company, and location are required</div>}
+
+    <div class="divider">// ─────────────────────────────────────────────────────</div>
+
+    <form method="POST" action={`/api/jobs/${job.id}`}>
+      <div class="form-grid">
+
+        <div class="field">
+          <label>JOB TITLE *</label>
+          <input type="text" name="title" value={job.title} required />
+        </div>
+
+        <div class="field">
+          <label>COMPANY *</label>
+          <input type="text" name="company" value={job.company} required />
+        </div>
+
+        <div class="field">
+          <label>LOCATION *</label>
+          <input type="text" name="location" value={job.location} required />
+        </div>
+
+        <div class="field">
+          <label>TYPE</label>
+          <select name="type">
+            {['full-time','part-time','contract','remote','internship'].map(t => (
+              <option value={t} selected={job.type === t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>SALARY / COMPENSATION</label>
+          <input type="text" name="salary" value={job.salary} />
+        </div>
+
+        <div class="field">
+          <label>EXPERIENCE</label>
+          <input type="text" name="experience" value={job.experience} />
+        </div>
+
+        <div class="field">
+          <label>CATEGORY</label>
+          <select name="category">
+            {['Backend','Frontend','Full-Stack','Mobile','DevOps','Data','AI / ML','Design','Security','Product'].map(c => (
+              <option value={c} selected={job.category === c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>DATE POSTED</label>
+          <input type="date" name="posted" value={job.posted} />
+        </div>
+
+        <div class="field full">
+          <label>APPLY URL</label>
+          <input type="url" name="apply_url" value={job.applyUrl} />
+        </div>
+
+        <div class="field full">
+          <label>SKILLS / TAGS</label>
+          <input type="text" name="tags" value={job.tags.join(', ')} />
+          <span class="hint">comma-separated</span>
+        </div>
+
+        <div class="field full">
+          <div class="check-row">
+            <input type="checkbox" name="remote" id="remote" checked={job.remote} />
+            <label for="remote" style="letter-spacing:1px">REMOTE OK</label>
+          </div>
+          <div class="check-row" style="margin-top:8px">
+            <input type="checkbox" name="urgent" id="urgent" checked={job.urgent} />
+            <label for="urgent" style="letter-spacing:1px">URGENT HIRE</label>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>JOB DESCRIPTION (Markdown)</label>
+          <textarea name="body">{job.body}</textarea>
+          <span class="hint">supports **bold**, ## headings, - lists</span>
+        </div>
+
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn primary">[ SAVE_CHANGES → ]</button>
+        <a href="/admin/dashboard" class="btn">[ CANCEL ]</a>
+        <form method="POST" action={`/api/jobs/${job.id}`} style="margin:0" onsubmit="return confirm('Delete this job permanently?')">
+          <input type="hidden" name="_method" value="DELETE" />
+          <button type="submit" class="btn danger">[ DELETE_JOB ]</button>
+        </form>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(CLOUDFLARE_ACCOUNT_ID=c38bb7d20c6e17243141e9bafcff2292 npx wrangler d1 create dailyjobpost-jobs)",
+      "Bash(mkdir -p /Users/manoj/Downloads/joblisting-terminal/migrations /Users/manoj/Downloads/joblisting-terminal/src/lib /Users/manoj/Downloads/joblisting-terminal/src/pages/api/auth /Users/manoj/Downloads/joblisting-terminal/src/pages/api/jobs /Users/manoj/Downloads/joblisting-terminal/src/pages/admin/jobs)",
+      "Bash(CLOUDFLARE_ACCOUNT_ID=c38bb7d20c6e17243141e9bafcff2292 npx wrangler d1 migrations apply dailyjobpost-jobs --remote)",
+      "Bash(CLOUDFLARE_ACCOUNT_ID=c38bb7d20c6e17243141e9bafcff2292 npx wrangler d1 execute dailyjobpost-jobs --remote --file=migrations/001_init.sql)"
+    ],
+    "additionalDirectories": [
+      "/Users/manoj/Downloads/joblisting-terminal"
+    ]
+  }
+}

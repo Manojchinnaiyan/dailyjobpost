@@ -1,0 +1,9 @@
+name = "dailyjobpost"
+compatibility_date = "2026-06-11"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dailyjobpost-jobs"
+database_id = "bb3bfa4b-e01a-4698-a21f-a89d4a5881a5"

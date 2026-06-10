@@ -1,0 +1,4 @@
+# Copy this to .dev.vars and fill in your values (never commit .dev.vars)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+SESSION_SECRET=any-random-long-string-here

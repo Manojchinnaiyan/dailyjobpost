@@ -1,0 +1,135 @@
+---
+export const prerender = false;
+import { SESSION_COOKIE, getSession } from '../../lib/auth';
+import type { JobRow } from '../../lib/db';
+
+const { env } = Astro.locals.runtime;
+const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
+const session = await getSession(env.DB, sid);
+if (!session) return Astro.redirect('/admin/login');
+
+const result = await env.DB.prepare('SELECT * FROM jobs ORDER BY posted DESC, created_at DESC').all<JobRow>();
+const jobs = result.results ?? [];
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — dailyjobpost.online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+    body { background: #0a0a0a; color: #33ff00; font-family: 'JetBrains Mono', monospace; font-size: 13px; min-height: 100vh; }
+    .topbar { background: #1f521f; color: #0a0a0a; padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 1px; font-weight: 700; }
+    .topbar a, .topbar button { color: #0a0a0a; text-decoration: none; font-family: inherit; font-size: 11px; font-weight: 700; background: none; border: none; cursor: pointer; letter-spacing: 1px; }
+    .topbar a:hover, .topbar button:hover { text-decoration: underline; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+    .page-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .page-title { font-size: 14px; font-weight: 700; text-shadow: 0 0 6px rgba(51,255,0,0.45); }
+    .page-sub { font-size: 11px; color: #3a7a3a; margin-top: 2px; }
+    .btn { background: transparent; border: 1px solid #3a7a3a; color: #3a7a3a; font-family: inherit; font-size: 11px; padding: 5px 14px; cursor: pointer; letter-spacing: 1px; text-decoration: none; display: inline-block; }
+    .btn:hover, .btn.primary { background: #33ff00; color: #0a0a0a; border-color: #33ff00; text-shadow: none; }
+    .btn.danger:hover { background: #ff3333; color: #fff; border-color: #ff3333; }
+    .divider { color: #1f521f; font-size: 11px; margin: 12px 0; letter-spacing: 1px; }
+    .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .stat { border: 1px dashed #1f521f; padding: 8px 16px; text-align: center; min-width: 100px; }
+    .stat-n { font-size: 20px; font-weight: 700; text-shadow: 0 0 6px rgba(51,255,0,0.45); }
+    .stat-l { font-size: 10px; color: #3a7a3a; letter-spacing: 1px; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 10px; letter-spacing: 2px; color: #3a7a3a; padding: 6px 8px; border-bottom: 1px solid #1f521f; }
+    td { padding: 8px 8px; border-bottom: 1px dashed #1a3a1a; vertical-align: top; font-size: 12px; }
+    tr:hover td { background: rgba(51,255,0,0.03); }
+    .job-title-cell { max-width: 260px; }
+    .job-title-val { font-weight: 700; color: #33ff00; text-shadow: 0 0 4px rgba(51,255,0,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; display: block; }
+    .job-co { font-size: 11px; color: #3a7a3a; margin-top: 2px; }
+    .badge { font-size: 10px; padding: 1px 5px; border: 1px solid #3a7a3a; color: #3a7a3a; letter-spacing: 1px; }
+    .badge.remote { border-color: #33ff00; color: #33ff00; }
+    .badge.urgent { border-color: #ffb000; color: #ffb000; }
+    .actions { display: flex; gap: 6px; align-items: center; }
+    .empty { color: #3a7a3a; font-size: 12px; padding: 40px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <span>▶ ADMIN_DASHBOARD // {session.email}</span>
+    <span>
+      <a href="/" target="_blank">[ LIVE_SITE → ]</a>
+      &nbsp;&nbsp;
+      <form method="POST" action="/api/auth/logout" style="display:inline">
+        <button type="submit">[ LOGOUT ]</button>
+      </form>
+    </span>
+  </div>
+
+  <div class="wrap">
+    <div class="page-hdr">
+      <div>
+        <div class="page-title">JOB_LISTINGS</div>
+        <div class="page-sub">manage job posts · {jobs.length} total</div>
+      </div>
+      <a href="/admin/jobs/new" class="btn primary">[ + NEW_JOB ]</a>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-n">{jobs.length}</div>
+        <div class="stat-l">TOTAL</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">{jobs.filter(j => j.remote).length}</div>
+        <div class="stat-l">REMOTE</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">{jobs.filter(j => j.urgent).length}</div>
+        <div class="stat-l">URGENT</div>
+      </div>
+    </div>
+
+    <div class="divider">// ─────────────────────────────────────────────────────────</div>
+
+    {jobs.length === 0 ? (
+      <div class="empty">no jobs yet — click [ + NEW_JOB ] to add the first one</div>
+    ) : (
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>JOB</th>
+            <th>TYPE</th>
+            <th>POSTED</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => (
+            <tr>
+              <td style="color:#3a7a3a;font-size:11px">#{job.id}</td>
+              <td class="job-title-cell">
+                <span class="job-title-val">{job.title}</span>
+                <div class="job-co">{job.company} · {job.location}</div>
+              </td>
+              <td>
+                <span class="badge">{job.type.toUpperCase()}</span>
+                {Boolean(job.remote) && <span class="badge remote" style="margin-left:4px">REMOTE</span>}
+                {Boolean(job.urgent) && <span class="badge urgent" style="margin-left:4px">URGENT</span>}
+              </td>
+              <td style="font-size:11px;color:#3a7a3a">{job.posted}</td>
+              <td>
+                <div class="actions">
+                  <a href={`/admin/jobs/${job.id}`} class="btn">[ EDIT ]</a>
+                  <form method="POST" action={`/api/jobs/${job.id}`} onsubmit="return confirm('Delete this job?')">
+                    <input type="hidden" name="_method" value="DELETE" />
+                    <button type="submit" class="btn danger">[ DEL ]</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</body>
+</html>

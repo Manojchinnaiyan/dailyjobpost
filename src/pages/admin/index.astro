@@ -1,0 +1,10 @@
+---
+export const prerender = false;
+import { SESSION_COOKIE, getSession } from '../../lib/auth';
+
+const { env } = Astro.locals.runtime;
+const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
+const session = await getSession(env.DB, sid);
+
+return Astro.redirect(session ? '/admin/dashboard' : '/admin/login');
+---

@@ -1,28 +1,13 @@
 ---
-import { getCollection } from 'astro:content';
+export const prerender = false;
 import Base from '../layouts/Base.astro';
 import JobList from '../components/JobList';
 import type { Job } from '../components/JobList';
+import { rowToJob, type JobRow } from '../lib/db';
 
-const entries = await getCollection('jobs');
-
-const jobs: Job[] = entries
-  .sort((a, b) => b.data.posted.getTime() - a.data.posted.getTime())
-  .map((e) => ({
-    slug:       e.slug,
-    title:      e.data.title,
-    company:    e.data.company,
-    location:   e.data.location,
-    type:       e.data.type,
-    remote:     e.data.remote,
-    urgent:     e.data.urgent,
-    salary:     e.data.salary,
-    tags:       e.data.tags,
-    posted:     e.data.posted.toISOString(),
-    applyUrl:   e.data.applyUrl,
-    experience: e.data.experience,
-    category:   e.data.category,
-  }));
+const { env } = Astro.locals.runtime;
+const result = await env.DB.prepare('SELECT * FROM jobs ORDER BY posted DESC, created_at DESC').all<JobRow>();
+const jobs: Job[] = (result.results ?? []).map(rowToJob);
 
 // JSON-LD
 const jsonLd = JSON.stringify({

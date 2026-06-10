@@ -1,0 +1,55 @@
+---
+export const prerender = false;
+import { SESSION_COOKIE, getSession } from '../../lib/auth';
+
+const { env } = Astro.locals.runtime;
+const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
+const session = await getSession(env.DB, sid);
+if (session) return Astro.redirect('/admin/dashboard');
+
+const error = Astro.url.searchParams.get('error');
+const errorMsg: Record<string, string> = {
+  state:        '[ERR] OAuth state mismatch — try again',
+  token:        '[ERR] Failed to exchange token with Google',
+  userinfo:     '[ERR] Failed to retrieve Google profile',
+  unauthorized: '[ERR] Access denied — this account is not authorized',
+};
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login — dailyjobpost.online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+    body { background: #0a0a0a; color: #33ff00; font-family: 'JetBrains Mono', monospace; font-size: 13px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .box { border: 1px solid #1f521f; width: 100%; max-width: 420px; }
+    .box-hdr { background: #1f521f; color: #0a0a0a; padding: 6px 12px; font-size: 11px; letter-spacing: 2px; font-weight: 700; }
+    .box-body { padding: 32px 24px; display: flex; flex-direction: column; gap: 20px; }
+    .prompt-line { color: #ffb000; font-size: 12px; }
+    .cmd { color: #33ff00; text-shadow: 0 0 6px rgba(51,255,0,0.45); }
+    .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: transparent; border: 1px solid #3a7a3a; color: #33ff00; font-family: inherit; font-size: 12px; padding: 10px 20px; cursor: pointer; letter-spacing: 1px; text-decoration: none; transition: background 0.15s; }
+    .btn-google:hover { background: #33ff00; color: #0a0a0a; border-color: #33ff00; }
+    .error { color: #ff3333; font-size: 11px; letter-spacing: 1px; }
+    .muted { color: #3a7a3a; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="box-hdr">▶ ADMIN_ACCESS // dailyjobpost.online</div>
+    <div class="box-body">
+      <div>
+        <div class="prompt-line">user@dailyjobpost:~$ <span class="cmd">sudo auth --provider=google</span></div>
+      </div>
+      {error && <div class="error">{errorMsg[error] ?? '[ERR] Authentication failed'}</div>}
+      <a href="/api/auth/google" class="btn-google">
+        [ SIGN IN WITH GOOGLE → ]
+      </a>
+      <div class="muted">access restricted to authorized administrators only</div>
+    </div>
+  </div>
+</body>
+</html>

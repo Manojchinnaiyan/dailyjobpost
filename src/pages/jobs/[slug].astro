@@ -1,175 +1,134 @@
 ---
-import { getCollection } from 'astro:content';
+export const prerender = false;
+import { marked } from 'marked';
 import Base from '../../layouts/Base.astro';
+import { rowToJob, type JobRow } from '../../lib/db';
 
-export async function getStaticPaths() {
-  const jobs = await getCollection('jobs');
-  return jobs.map((job) => ({
-    params: { slug: job.slug },
-    props:  { job },
-  }));
-}
+const { slug } = Astro.params;
+const { env } = Astro.locals.runtime;
 
-const { job } = Astro.props;
-const { Content } = await job.render();
+const row = await env.DB.prepare('SELECT * FROM jobs WHERE slug = ?').bind(slug).first<JobRow>();
+if (!row) return Astro.redirect('/');
 
-const d = job.data;
+const job = rowToJob(row);
+const bodyHtml = job.body ? await marked.parse(job.body) : '';
 
 function initials(company: string): string {
-  return company
-    .split(/[\s\-_]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w: string) => w[0].toUpperCase())
-    .join('');
+  return company.split(/[\s\-_]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
 
-function daysAgo(date: Date): string {
-  const diff = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+function daysAgo(posted: string): string {
+  const diff = Math.floor((Date.now() - new Date(posted).getTime()) / 86_400_000);
   if (diff === 0) return 'today';
   if (diff === 1) return '1d ago';
   return `${diff}d ago`;
 }
 
-const typeLabel = d.type.toUpperCase().replace('-', '_');
+const typeLabel = job.type.toUpperCase().replace('-', '_');
 
 const employmentTypeMap: Record<string, string> = {
-  'full-time':  'FULL_TIME',
-  'part-time':  'PART_TIME',
-  'contract':   'CONTRACTOR',
-  'remote':     'FULL_TIME',
-  'internship': 'INTERN',
+  'full-time': 'FULL_TIME', 'part-time': 'PART_TIME',
+  'contract': 'CONTRACTOR', 'remote': 'FULL_TIME', 'internship': 'INTERN',
 };
 
 const jobLd: Record<string, unknown> = {
   "@context": "https://schema.org",
   "@type": "JobPosting",
-  "title": d.title,
-  "description": `${d.title} at ${d.company}. ${d.location}. ${d.salary ?? ''}`,
-  "datePosted": d.posted.toISOString().split('T')[0],
-  "hiringOrganization": { "@type": "Organization", "name": d.company },
-  "jobLocation": {
-    "@type": "Place",
-    "address": { "@type": "PostalAddress", "addressLocality": d.location, "addressCountry": "US" }
-  },
-  "employmentType": employmentTypeMap[d.type] ?? 'OTHER',
+  "title": job.title,
+  "description": `${job.title} at ${job.company}. ${job.location}. ${job.salary ?? ''}`,
+  "datePosted": job.posted,
+  "hiringOrganization": { "@type": "Organization", "name": job.company },
+  "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location } },
+  "employmentType": employmentTypeMap[job.type] ?? 'OTHER',
   "url": `https://dailyjobpost.online/jobs/${job.slug}`,
 };
-if (d.remote || d.type === 'remote') {
-  jobLd["jobLocationType"] = "TELECOMMUTE";
-  (jobLd["applicantLocationRequirements"] as unknown) = { "@type": "Country", "name": "United States" };
-}
-if (d.applyUrl) jobLd["url"] = d.applyUrl;
-
-const jobLdStr = JSON.stringify(jobLd);
+if (job.remote || job.type === 'remote') jobLd["jobLocationType"] = "TELECOMMUTE";
+if (job.applyUrl) jobLd["url"] = job.applyUrl;
 ---
 
 <Base
-  title={`${d.title} @ ${d.company} — dailyjobpost.online`}
-  description={`${d.title} at ${d.company}. ${d.location}. ${d.salary ?? ''}. Apply now on dailyjobpost.online.`}
+  title={`${job.title} @ ${job.company} — dailyjobpost.online`}
+  description={`${job.title} at ${job.company}. ${job.location}. ${job.salary ?? ''}. Apply now on dailyjobpost.online.`}
 >
-  <script slot="head" type="application/ld+json" is:inline set:html={jobLdStr} />
+  <script slot="head" type="application/ld+json" is:inline set:html={JSON.stringify(jobLd)} />
 
   <div class="detail-wrap">
 
-    <!-- Back link -->
     <a href="/" class="back-link">← BACK_TO_JOBS</a>
 
-    <!-- ── Job header card ─────────────────────────────────── -->
     <div class="detail-card">
-
       <div class="detail-card-hdr">
-        <span>▶ JOB_POSTING // {typeLabel}{d.remote || d.type === 'remote' ? ' // REMOTE' : ''}</span>
-        {d.urgent && <span class="hdr-urgent">[URGENT_HIRE]</span>}
+        <span>▶ JOB_POSTING // {typeLabel}{job.remote || job.type === 'remote' ? ' // REMOTE' : ''}</span>
+        {job.urgent && <span class="hdr-urgent">[URGENT_HIRE]</span>}
       </div>
 
       <div class="detail-card-body">
-
-        <!-- Company + title row -->
         <div class="detail-top">
-          <div class={`detail-logo${d.urgent ? ' detail-logo--urgent' : ''}`}>
-            {initials(d.company)}
-          </div>
+          <div class={`detail-logo${job.urgent ? ' detail-logo--urgent' : ''}`}>{initials(job.company)}</div>
           <div class="detail-top-text">
-            <h1 class="detail-title">{d.title}</h1>
-            <div class="detail-company">{d.company}</div>
-            <div class="detail-posted">posted {daysAgo(d.posted)}</div>
+            <h1 class="detail-title">{job.title}</h1>
+            <div class="detail-company">{job.company}</div>
+            <div class="detail-posted">posted {daysAgo(job.posted)}</div>
           </div>
         </div>
 
         <div class="detail-divider">─────────────────────────────────────────────────────</div>
 
-        <!-- Badges -->
         <div class="detail-badges">
           <span class="badge badge--ok">{typeLabel}</span>
-          {d.urgent  && <span class="badge badge--warn">URGENT</span>}
-          {(d.remote || d.type === 'remote') && <span class="badge badge--ok">REMOTE</span>}
+          {job.urgent && <span class="badge badge--warn">URGENT</span>}
+          {(job.remote || job.type === 'remote') && <span class="badge badge--ok">REMOTE</span>}
         </div>
 
-        <!-- Meta grid -->
         <div class="detail-meta-grid">
           <div class="detail-meta-item">
             <span class="detail-meta-lbl">LOCATION</span>
-            <span class="detail-meta-val">&#x1F4CD; {d.location}</span>
+            <span class="detail-meta-val">📍 {job.location}</span>
           </div>
-          {d.salary && (
+          {job.salary && (
             <div class="detail-meta-item">
               <span class="detail-meta-lbl">SALARY</span>
-              <span class="detail-meta-val detail-salary">{d.salary}</span>
+              <span class="detail-meta-val detail-salary">{job.salary}</span>
             </div>
           )}
-          {d.experience && (
+          {job.experience && (
             <div class="detail-meta-item">
               <span class="detail-meta-lbl">EXPERIENCE</span>
-              <span class="detail-meta-val">{d.experience}</span>
+              <span class="detail-meta-val">{job.experience}</span>
             </div>
           )}
         </div>
 
-        <!-- Tags -->
-        <div class="job-tags">
-          {d.tags.map((tag: string) => <span class="job-tag">{tag}</span>)}
-        </div>
+        {job.tags.length > 0 && (
+          <div class="job-tags">
+            {job.tags.map((tag) => <span class="job-tag">{tag}</span>)}
+          </div>
+        )}
 
         <div class="detail-divider">─────────────────────────────────────────────────────</div>
-
-
       </div>
     </div>
 
-    <!-- ── Job description ─────────────────────────────────── -->
     <div class="detail-desc">
       <div class="detail-desc-hdr">▶ JOB_DESCRIPTION</div>
-      <div class="detail-divider" style="margin-top: 0;">
-        ──────────────────────────────────────────────────────────────
-      </div>
-      <div class="md-content">
-        <Content />
-      </div>
+      <div class="detail-divider" style="margin-top: 0;">──────────────────────────────────────────────────────────────</div>
+      <div class="md-content" set:html={bodyHtml} />
     </div>
 
-    <!-- ── Bottom apply CTA ───────────────────────────────── -->
-    {d.applyUrl ? (
+    {job.applyUrl ? (
       <div class="detail-apply-bottom">
         <span class="detail-apply-bottom-lbl">READY TO APPLY? DON'T MISS THIS OPPORTUNITY.</span>
-        <a
-          href={d.applyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="detail-apply-cta"
-        >
+        <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" class="detail-apply-cta">
           [ APPLY_NOW → ]
         </a>
       </div>
     ) : (
       <div class="detail-apply-bottom">
-        <span class="detail-apply-bottom-lbl">no direct apply link — contact {d.company} directly</span>
+        <span class="detail-apply-bottom-lbl">no direct apply link — contact {job.company} directly</span>
       </div>
     )}
 
-    <!-- Back link bottom -->
     <a href="/" class="back-link" style="margin-top: 8px; display: inline-block;">← BACK_TO_JOBS</a>
 
   </div>
-
 </Base>
