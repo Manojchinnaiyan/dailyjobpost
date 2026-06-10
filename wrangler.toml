@@ -1,7 +1,11 @@
 name = "dailyjobpost"
-compatibility_date = "2026-06-11"
+compatibility_date = "2026-05-14"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "dist"
+main = "dist/_worker.js/index.js"
+
+[assets]
+binding = "ASSETS"
+directory = "dist"
 
 [[d1_databases]]
 binding = "DB"
