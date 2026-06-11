@@ -1,0 +1,45 @@
+name: Daily job import
+
+on:
+  schedule:
+    - cron: '30 2 * * *'   # every day at 02:30 UTC (08:00 IST)
+  workflow_dispatch: {}     # allows manual runs from the Actions tab
+
+concurrency:
+  group: import-jobs
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch jobs from Greenhouse / Lever / Ashby
+        run: node scripts/import-jobs.mjs
+
+      - name: Prune jobs older than 45 days
+        run: >
+          npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y
+          --command "DELETE FROM jobs WHERE posted < date('now','-45 days')"
+
+      - name: Insert new jobs into D1
+        run: |
+          shopt -s nullglob
+          files=(jobs-batch-*.sql)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No batch files produced — nothing to import."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "Importing $f"
+            npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y --file="$f"
+          done

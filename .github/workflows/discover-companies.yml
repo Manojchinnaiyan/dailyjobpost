@@ -1,0 +1,39 @@
+name: Weekly company discovery
+
+on:
+  schedule:
+    - cron: '0 1 * * 0'    # every Sunday at 01:00 UTC
+  workflow_dispatch: {}     # allows manual runs from the Actions tab
+
+permissions:
+  contents: write           # commits the updated companies.json back
+
+concurrency:
+  group: discover-companies
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Discover new ATS boards via Common Crawl
+        run: node scripts/discover-companies.mjs
+
+      - name: Commit updated company list
+        run: |
+          if git diff --quiet scripts/companies.json 2>/dev/null && [ -z "$(git status --porcelain scripts/companies.json)" ]; then
+            echo "No new companies discovered."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scripts/companies.json
+          git commit -m "chore: weekly auto-discovered company boards"
+          git push
