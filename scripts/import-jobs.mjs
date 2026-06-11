@@ -397,6 +397,11 @@ async function main() {
     files.push(name);
   }
   log(`Wrote ${files.length} batch file(s): ${files.join(' ')}`);
+
+  // Statements as JSON for scripts/apply-sql.mjs (D1 HTTP API — no DB lock,
+  // unlike `wrangler d1 execute --file`, which takes the site down).
+  await writeFile('jobs-statements.json', JSON.stringify(stmts));
+  log(`Wrote jobs-statements.json (${stmts.length} statements)`);
 }
 
 main();

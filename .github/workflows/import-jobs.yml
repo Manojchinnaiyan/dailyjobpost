@@ -26,36 +26,18 @@ jobs:
       - name: Fetch jobs from Greenhouse / Lever / Ashby
         run: node scripts/import-jobs.mjs
 
+      # All writes go through the D1 HTTP /query API (scripts/apply-sql.mjs).
+      # Never use `wrangler d1 execute --file` here — its bulk import locks
+      # the database and takes the live site down while it runs.
       - name: Prune jobs older than 45 days
-        run: |
-          # Cloudflare's API occasionally returns transient auth/5xx errors — retry.
-          d1() {
-            for attempt in 1 2 3 4; do
-              npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y "$@" && return 0
-              echo "Attempt $attempt failed, retrying in $((attempt * 15))s..."
-              sleep $((attempt * 15))
-            done
-            return 1
-          }
-          d1 --command "DELETE FROM jobs WHERE posted < date('now','-45 days')"
+        run: >
+          node scripts/apply-sql.mjs --command
+          "DELETE FROM jobs WHERE posted < date('now','-45 days');"
 
       - name: Insert new jobs into D1
         run: |
-          d1() {
-            for attempt in 1 2 3 4; do
-              npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y "$@" && return 0
-              echo "Attempt $attempt failed, retrying in $((attempt * 15))s..."
-              sleep $((attempt * 15))
-            done
-            return 1
-          }
-          shopt -s nullglob
-          files=(jobs-batch-*.sql)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No batch files produced — nothing to import."
+          if [ ! -f jobs-statements.json ]; then
+            echo "No statements produced — nothing to import."
             exit 0
           fi
-          for f in "${files[@]}"; do
-            echo "Importing $f"
-            d1 --file="$f"
-          done
+          node scripts/apply-sql.mjs jobs-statements.json
