@@ -1,0 +1,202 @@
+---
+export const prerender = false;
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="About — dailyjobpost.online"
+  description="Daily job postings across every industry, worldwide. Find remote and on-site roles updated every day."
+>
+  <div class="about-wrap">
+
+    <div class="about-inner">
+
+      <div class="about-header">
+        <div class="about-ps1">
+          <span class="ps1-prompt">user@dailyjobpost:~$</span>
+          <span class="ps1-cmd"> cat about.md</span>
+        </div>
+        <h1 class="about-title">About dailyjobpost.online</h1>
+        <p class="about-sub">A daily-updated job board connecting people to opportunities worldwide.</p>
+      </div>
+
+      <div class="about-divider">// ═══════════════════════════════════════════ //</div>
+
+      <div class="about-sections">
+
+        <div class="about-section">
+          <div class="about-section-title">▶ WHAT_WE_DO</div>
+          <div class="about-section-body">
+            <p>dailyjobpost.online is a global job board covering every industry. We publish new job listings every day — software, marketing, sales, finance, design, healthcare, education, operations, customer support, and many more.</p>
+            <p>We focus on quality and freshness. Listings are organised so you can search and filter by role, skill, company, industry, and country to find the right opportunity faster.</p>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ WHY_WE_EXIST</div>
+          <div class="about-section-body">
+            <p>Job searching is painful. Most job boards are bloated, slow, and full of outdated listings. We built dailyjobpost.online to be the opposite — fast, clean, and updated daily, so you spend less time searching and more time applying.</p>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ INDUSTRIES</div>
+          <div class="about-section-body">
+            <ul class="about-list">
+              <li>💻 Software &amp; IT · 📊 Data &amp; Analytics · 📦 Product</li>
+              <li>📣 Marketing · 💼 Sales · 🎨 Design</li>
+              <li>💰 Finance · ⚖️ Legal · 👥 Human Resources</li>
+              <li>🏥 Healthcare · 🎓 Education · ⚙️ Operations</li>
+              <li>🎧 Customer Support · ✍️ Writing &amp; Content · and more</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ COVERAGE</div>
+          <div class="about-section-body">
+            <ul class="about-list">
+              <li>🌐 Remote-first and remote-friendly roles worldwide</li>
+              <li>🇺🇸 United States · 🇮🇳 India · 🇬🇧 United Kingdom</li>
+              <li>🇨🇦 Canada · 🇦🇺 Australia · 🇩🇪 Germany</li>
+              <li>🇸🇬 Singapore · 🇦🇪 UAE · 🇳🇱 Netherlands</li>
+              <li>🇫🇷 France · 🇯🇵 Japan · and more added daily</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ CONTACT</div>
+          <div class="about-section-body">
+            <p>For job posting inquiries, partnerships, or feedback:</p>
+            <p><a href="mailto:contact@dailyjobpost.online" class="about-link">contact@dailyjobpost.online</a></p>
+            <p style="margin-top: 8px; font-size: 11px; color: var(--text-3);">We typically respond within 1–2 business days.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="about-divider">// ═══════════════════════════════════════════ //</div>
+
+      <div class="about-footer-links">
+        <a href="/">← Back to Jobs</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+
+    </div>
+  </div>
+</Base>
+
+<style>
+.about-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+.about-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.about-header {
+  margin-bottom: 32px;
+}
+
+.about-ps1 {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 20px;
+}
+.ps1-prompt { color: var(--amber); }
+.ps1-cmd { color: var(--text-2); }
+
+.about-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--green);
+  text-shadow: var(--glow);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.about-sub {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.about-divider {
+  color: var(--text-3);
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin: 24px 0;
+}
+
+.about-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.about-section {
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: var(--surface);
+}
+.about-section:last-child { border-bottom: 1px solid var(--border); }
+
+.about-section-title {
+  background: var(--border);
+  color: var(--text-2);
+  padding: 6px 14px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+
+.about-section-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.about-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.about-list li {
+  padding-left: 4px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.about-link {
+  color: var(--green);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(51,255,0,0.3);
+}
+.about-link:hover { border-bottom-color: var(--green); }
+
+.about-footer-links {
+  display: flex;
+  gap: 24px;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 24px;
+}
+.about-footer-links a {
+  color: var(--text-3);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2px;
+  transition: color 0.1s, border-color 0.1s;
+}
+.about-footer-links a:hover { color: var(--green); border-color: var(--green); }
+</style>

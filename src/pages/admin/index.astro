@@ -6,5 +6,5 @@ const { env } = Astro.locals.runtime;
 const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
 const session = await getSession(env.DB, sid);
 
-return Astro.redirect(session ? '/admin/dashboard' : '/admin/login');
+return Astro.redirect(session?.role === 'admin' ? '/admin/dashboard' : '/admin/login');
 ---

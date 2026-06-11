@@ -6,7 +6,7 @@ import { rowToJob, type JobRow } from '../../../lib/db';
 const { env } = Astro.locals.runtime;
 const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
 const session = await getSession(env.DB, sid);
-if (!session) return Astro.redirect('/admin/login');
+if (!session || session.role !== 'admin') return Astro.redirect('/admin/login');
 
 const { id } = Astro.params;
 const row = await env.DB.prepare('SELECT * FROM jobs WHERE id = ?').bind(id).first<JobRow>();
@@ -20,141 +20,169 @@ const error = Astro.url.searchParams.get('error');
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Edit Job — Admin</title>
+  <title>Edit Job #{job.id} — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
-    body { background: #0a0a0a; color: #33ff00; font-family: 'JetBrains Mono', monospace; font-size: 13px; min-height: 100vh; }
-    .topbar { background: #1f521f; color: #0a0a0a; padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 1px; font-weight: 700; }
-    .topbar a { color: #0a0a0a; text-decoration: none; }
-    .topbar a:hover { text-decoration: underline; }
-    .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px; }
-    .page-title { font-size: 14px; font-weight: 700; text-shadow: 0 0 6px rgba(51,255,0,0.45); margin-bottom: 4px; }
-    .divider { color: #1f521f; font-size: 11px; margin: 16px 0 20px; letter-spacing: 1px; }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-    .field { display: flex; flex-direction: column; gap: 5px; }
-    .field.full { grid-column: 1 / -1; }
-    label { font-size: 10px; letter-spacing: 2px; color: #3a7a3a; }
-    input, select, textarea { background: #0d0d0d; border: 1px solid #1f521f; color: #33ff00; font-family: inherit; font-size: 12px; padding: 7px 10px; width: 100%; outline: none; }
-    input:focus, select:focus, textarea:focus { border-color: #33ff00; }
-    select option { background: #0a0a0a; }
-    textarea { resize: vertical; min-height: 220px; line-height: 1.6; }
-    .check-row { display: flex; align-items: center; gap: 8px; }
-    input[type="checkbox"] { width: auto; accent-color: #33ff00; }
-    .form-actions { display: flex; gap: 12px; align-items: center; margin-top: 24px; flex-wrap: wrap; }
-    .btn { background: transparent; border: 1px solid #3a7a3a; color: #3a7a3a; font-family: inherit; font-size: 11px; padding: 8px 20px; cursor: pointer; letter-spacing: 1px; text-decoration: none; display: inline-block; }
-    .btn:hover, .btn.primary { background: #33ff00; color: #0a0a0a; border-color: #33ff00; }
-    .btn.danger:hover { background: #ff3333; color: #fff; border-color: #ff3333; }
-    .error { color: #ff3333; font-size: 11px; letter-spacing: 1px; }
-    .hint { font-size: 10px; color: #3a7a3a; }
+    :root {
+      --bg: #f1f5f9; --white: #fff; --border: #e2e8f0;
+      --text: #0f172a; --text-2: #475569; --text-3: #94a3b8;
+      --green: #16a34a; --red: #dc2626; --red-l: #fef2f2;
+      --font: 'JetBrains Mono', monospace;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.6; min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+
+    .ah { background: var(--white); border-bottom: 2px solid var(--green); position: sticky; top: 0; z-index: 100; }
+    .ah-inner { max-width: 1280px; margin: 0 auto; padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 16px; }
+    .ah-brand { font-size: 12px; font-weight: 700; color: var(--green); letter-spacing: 2px; }
+    .ah-back { font-size: 11px; color: var(--text-3); padding: 16px 10px; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .ah-back:hover { color: var(--green); border-color: var(--green); }
+    .ah-right { margin-left: auto; font-size: 10px; color: var(--text-3); }
+
+    .btn { font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; padding: 8px 18px; border: 1px solid transparent; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all 0.1s; }
+    .btn-primary { background: var(--green); color: #fff; border-color: var(--green); }
+    .btn-primary:hover { background: #15803d; }
+    .btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--bg); }
+    .btn-danger { background: transparent; color: var(--red); border-color: var(--border); }
+    .btn-danger:hover { background: var(--red-l); border-color: var(--red); }
+
+    .awrap { max-width: 860px; margin: 0 auto; padding: 32px 24px 60px; }
+    .aph { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .aph-title { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+    .aph-sub { font-size: 11px; color: var(--text-3); }
+
+    .aerror { color: var(--red); font-size: 11px; background: var(--red-l); border: 1px solid #fca5a5; padding: 10px 14px; margin-bottom: 20px; }
+
+    .agrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 640px) { .agrid { grid-template-columns: 1fr; } }
+    .afield { display: flex; flex-direction: column; gap: 5px; }
+    .afield.full { grid-column: 1 / -1; }
+    .alabel { font-size: 9px; letter-spacing: 2px; color: var(--text-3); font-weight: 700; }
+    .ainput, .aselect, .atextarea {
+      background: var(--white); border: 1px solid var(--border); color: var(--text);
+      font-family: var(--font); font-size: 12px; padding: 9px 12px; width: 100%;
+      outline: none; transition: border-color 0.15s;
+    }
+    .ainput:focus, .aselect:focus, .atextarea:focus { border-color: var(--green); }
+    .atextarea { resize: vertical; min-height: 220px; line-height: 1.7; }
+    .acheck-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+    .acheck-row input[type="checkbox"] { accent-color: var(--green); width: 14px; height: 14px; }
+    .ahint { font-size: 10px; color: var(--text-3); }
+    .aform-actions { display: flex; gap: 10px; align-items: center; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .del-zone { margin-left: auto; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <span>▶ EDIT_JOB #{job.id} // <a href="/admin/dashboard">← BACK</a></span>
-    <span>{session.email}</span>
-  </div>
+  <header class="ah">
+    <div class="ah-inner">
+      <span class="ah-brand">$_ ADMIN</span>
+      <a href="/admin/dashboard" class="ah-back">← Dashboard</a>
+      <span class="ah-right">{session.email}</span>
+    </div>
+  </header>
 
-  <div class="wrap">
-    <div class="page-title">EDIT_JOB_POSTING</div>
-    <div style="font-size:11px;color:#3a7a3a;margin-top:2px">slug: {job.slug}</div>
+  <main class="awrap">
+    <div class="aph">
+      <div>
+        <div class="aph-title">Edit Job #{job.id}</div>
+        <div class="aph-sub">slug: {job.slug}</div>
+      </div>
+      <a href={`/jobs/${job.slug}`} target="_blank" class="btn btn-ghost" style="font-size:10px">↗ Preview</a>
+    </div>
 
-    {error && <div class="error" style="margin-top:12px">[ERR] Title, company, and location are required</div>}
-
-    <div class="divider">// ─────────────────────────────────────────────────────</div>
+    {error && <div class="aerror">Title, company, and location are required.</div>}
 
     <form method="POST" action={`/api/jobs/${job.id}`}>
-      <div class="form-grid">
+      <div class="agrid">
 
-        <div class="field">
-          <label>JOB TITLE *</label>
-          <input type="text" name="title" value={job.title} required />
+        <div class="afield">
+          <label class="alabel">JOB TITLE *</label>
+          <input class="ainput" type="text" name="title" value={job.title} required />
         </div>
 
-        <div class="field">
-          <label>COMPANY *</label>
-          <input type="text" name="company" value={job.company} required />
+        <div class="afield">
+          <label class="alabel">COMPANY *</label>
+          <input class="ainput" type="text" name="company" value={job.company} required />
         </div>
 
-        <div class="field">
-          <label>LOCATION *</label>
-          <input type="text" name="location" value={job.location} required />
+        <div class="afield">
+          <label class="alabel">LOCATION *</label>
+          <input class="ainput" type="text" name="location" value={job.location} required />
         </div>
 
-        <div class="field">
-          <label>TYPE</label>
-          <select name="type">
+        <div class="afield">
+          <label class="alabel">TYPE</label>
+          <select class="aselect" name="type">
             {['full-time','part-time','contract','remote','internship'].map(t => (
               <option value={t} selected={job.type === t}>{t}</option>
             ))}
           </select>
         </div>
 
-        <div class="field">
-          <label>SALARY / COMPENSATION</label>
-          <input type="text" name="salary" value={job.salary} />
+        <div class="afield">
+          <label class="alabel">SALARY / COMP</label>
+          <input class="ainput" type="text" name="salary" value={job.salary} />
         </div>
 
-        <div class="field">
-          <label>EXPERIENCE</label>
-          <input type="text" name="experience" value={job.experience} />
+        <div class="afield">
+          <label class="alabel">EXPERIENCE</label>
+          <input class="ainput" type="text" name="experience" value={job.experience} />
         </div>
 
-        <div class="field">
-          <label>CATEGORY</label>
-          <select name="category">
-            {['Backend','Frontend','Full-Stack','Mobile','DevOps','Data','AI / ML','Design','Security','Product'].map(c => (
+        <div class="afield">
+          <label class="alabel">CATEGORY</label>
+          <select class="aselect" name="category">
+            {['Software / IT','Marketing','Sales','Finance','Design','Healthcare','Education','Data & Analytics','Operations','Human Resources','Customer Support','Engineering','Product','Legal','Writing & Content'].map(c => (
               <option value={c} selected={job.category === c}>{c}</option>
             ))}
           </select>
         </div>
 
-        <div class="field">
-          <label>DATE POSTED</label>
-          <input type="date" name="posted" value={job.posted} />
+        <div class="afield">
+          <label class="alabel">DATE POSTED</label>
+          <input class="ainput" type="date" name="posted" value={job.posted} />
         </div>
 
-        <div class="field full">
-          <label>APPLY URL</label>
-          <input type="url" name="apply_url" value={job.applyUrl} />
+        <div class="afield full">
+          <label class="alabel">APPLY URL</label>
+          <input class="ainput" type="url" name="apply_url" value={job.applyUrl} />
         </div>
 
-        <div class="field full">
-          <label>SKILLS / TAGS</label>
-          <input type="text" name="tags" value={job.tags.join(', ')} />
-          <span class="hint">comma-separated</span>
+        <div class="afield full">
+          <label class="alabel">TAGS (comma-separated)</label>
+          <input class="ainput" type="text" name="tags" value={job.tags.join(', ')} />
+          <span class="ahint">These appear as skill tags on the job listing.</span>
         </div>
 
-        <div class="field full">
-          <div class="check-row">
-            <input type="checkbox" name="remote" id="remote" checked={job.remote} />
-            <label for="remote" style="letter-spacing:1px">REMOTE OK</label>
-          </div>
-          <div class="check-row" style="margin-top:8px">
-            <input type="checkbox" name="urgent" id="urgent" checked={job.urgent} />
-            <label for="urgent" style="letter-spacing:1px">URGENT HIRE</label>
-          </div>
+        <div class="afield full" style="display:flex;gap:24px;flex-wrap:wrap">
+          <label class="acheck-row">
+            <input type="checkbox" name="remote" checked={job.remote} />
+            Remote OK
+          </label>
         </div>
 
-        <div class="field full">
-          <label>JOB DESCRIPTION (Markdown)</label>
-          <textarea name="body">{job.body}</textarea>
-          <span class="hint">supports **bold**, ## headings, - lists</span>
+        <div class="afield full">
+          <label class="alabel">JOB DESCRIPTION (Markdown supported)</label>
+          <textarea class="atextarea" name="body">{job.body}</textarea>
+          <span class="ahint">Supports **bold**, ## headings, - bullet lists, `code`.</span>
         </div>
 
       </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn primary">[ SAVE_CHANGES → ]</button>
-        <a href="/admin/dashboard" class="btn">[ CANCEL ]</a>
-        <form method="POST" action={`/api/jobs/${job.id}`} style="margin:0" onsubmit="return confirm('Delete this job permanently?')">
-          <input type="hidden" name="_method" value="DELETE" />
-          <button type="submit" class="btn danger">[ DELETE_JOB ]</button>
-        </form>
+      <div class="aform-actions">
+        <button type="submit" class="btn btn-primary">Save Changes →</button>
+        <a href="/admin/dashboard" class="btn btn-ghost">Cancel</a>
+        <div class="del-zone">
+          <form method="POST" action={`/api/jobs/${job.id}`} onsubmit="return confirm('Permanently delete this job?')" style="display:inline">
+            <input type="hidden" name="_method" value="DELETE" />
+            <button type="submit" class="btn btn-danger">Delete Job</button>
+          </form>
+        </div>
       </div>
     </form>
-  </div>
+  </main>
 </body>
 </html>

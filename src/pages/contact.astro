@@ -1,0 +1,64 @@
+---
+export const prerender = false;
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Base
+  title="Contact — dailyjobpost.online"
+  description="Get in touch with the dailyjobpost.online team — questions, feedback, job listing corrections, or partnership enquiries."
+>
+  <div class="about-wrap">
+
+    <div class="about-inner">
+
+      <div class="about-header">
+        <div class="about-ps1">
+          <span class="ps1-prompt">user@dailyjobpost:~$</span>
+          <span class="ps1-cmd"> cat contact.md</span>
+        </div>
+        <h1 class="about-title">Contact Us</h1>
+        <p class="about-sub">Questions, feedback, or corrections — we read everything.</p>
+      </div>
+
+      <div class="about-divider">// ═══════════════════════════════════════════ //</div>
+
+      <div class="about-sections">
+
+        <div class="about-section">
+          <div class="about-section-title">▶ EMAIL</div>
+          <div class="about-section-body">
+            <p>The fastest way to reach us is email. We aim to reply within 2 business days.</p>
+            <p><a href="mailto:contact@dailyjobpost.online" class="privacy-link">contact@dailyjobpost.online</a></p>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ REPORT_A_LISTING</div>
+          <div class="about-section-body">
+            <p>Found an expired, incorrect, or suspicious job listing? Email us the listing URL and what's wrong with it, and we'll review it promptly. Listings older than 45 days are removed automatically.</p>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ EMPLOYERS</div>
+          <div class="about-section-body">
+            <p>Hiring? We aggregate listings directly from company career boards. If you'd like your company's openings featured on dailyjobpost.online, get in touch and we'll set it up.</p>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">▶ RESPONSE_TIME</div>
+          <div class="about-section-body">
+            <p><span style="color: var(--green);">[OK]</span> Typical response: within 48 hours, Monday–Friday.</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <Footer />
+</Base>

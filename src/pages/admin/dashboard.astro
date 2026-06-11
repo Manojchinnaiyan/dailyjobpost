@@ -6,7 +6,7 @@ import type { JobRow } from '../../lib/db';
 const { env } = Astro.locals.runtime;
 const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
 const session = await getSession(env.DB, sid);
-if (!session) return Astro.redirect('/admin/login');
+if (!session || session.role !== 'admin') return Astro.redirect('/admin/login');
 
 const result = await env.DB.prepare('SELECT * FROM jobs ORDER BY posted DESC, created_at DESC').all<JobRow>();
 const jobs = result.results ?? [];
@@ -16,120 +16,169 @@ const jobs = result.results ?? [];
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Dashboard — dailyjobpost.online</title>
+  <title>Dashboard — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
-    body { background: #0a0a0a; color: #33ff00; font-family: 'JetBrains Mono', monospace; font-size: 13px; min-height: 100vh; }
-    .topbar { background: #1f521f; color: #0a0a0a; padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 1px; font-weight: 700; }
-    .topbar a, .topbar button { color: #0a0a0a; text-decoration: none; font-family: inherit; font-size: 11px; font-weight: 700; background: none; border: none; cursor: pointer; letter-spacing: 1px; }
-    .topbar a:hover, .topbar button:hover { text-decoration: underline; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
-    .page-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-    .page-title { font-size: 14px; font-weight: 700; text-shadow: 0 0 6px rgba(51,255,0,0.45); }
-    .page-sub { font-size: 11px; color: #3a7a3a; margin-top: 2px; }
-    .btn { background: transparent; border: 1px solid #3a7a3a; color: #3a7a3a; font-family: inherit; font-size: 11px; padding: 5px 14px; cursor: pointer; letter-spacing: 1px; text-decoration: none; display: inline-block; }
-    .btn:hover, .btn.primary { background: #33ff00; color: #0a0a0a; border-color: #33ff00; text-shadow: none; }
-    .btn.danger:hover { background: #ff3333; color: #fff; border-color: #ff3333; }
-    .divider { color: #1f521f; font-size: 11px; margin: 12px 0; letter-spacing: 1px; }
-    .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-    .stat { border: 1px dashed #1f521f; padding: 8px 16px; text-align: center; min-width: 100px; }
-    .stat-n { font-size: 20px; font-weight: 700; text-shadow: 0 0 6px rgba(51,255,0,0.45); }
-    .stat-l { font-size: 10px; color: #3a7a3a; letter-spacing: 1px; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; font-size: 10px; letter-spacing: 2px; color: #3a7a3a; padding: 6px 8px; border-bottom: 1px solid #1f521f; }
-    td { padding: 8px 8px; border-bottom: 1px dashed #1a3a1a; vertical-align: top; font-size: 12px; }
-    tr:hover td { background: rgba(51,255,0,0.03); }
-    .job-title-cell { max-width: 260px; }
-    .job-title-val { font-weight: 700; color: #33ff00; text-shadow: 0 0 4px rgba(51,255,0,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; display: block; }
-    .job-co { font-size: 11px; color: #3a7a3a; margin-top: 2px; }
-    .badge { font-size: 10px; padding: 1px 5px; border: 1px solid #3a7a3a; color: #3a7a3a; letter-spacing: 1px; }
-    .badge.remote { border-color: #33ff00; color: #33ff00; }
-    .badge.urgent { border-color: #ffb000; color: #ffb000; }
-    .actions { display: flex; gap: 6px; align-items: center; }
-    .empty { color: #3a7a3a; font-size: 12px; padding: 40px 0; text-align: center; }
+    :root {
+      --bg: #f1f5f9; --white: #fff; --border: #e2e8f0; --border2: #f8fafc;
+      --text: #0f172a; --text-2: #475569; --text-3: #94a3b8;
+      --green: #16a34a; --green-l: #f0fdf4; --green-b: #86efac;
+      --red: #dc2626; --red-l: #fef2f2;
+      --amber: #d97706; --amber-l: #fffbeb;
+      --blue: #2563eb; --blue-l: #eff6ff;
+      --font: 'JetBrains Mono', monospace;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.6; min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+
+    /* Header */
+    .ah { background: var(--white); border-bottom: 2px solid var(--green); position: sticky; top: 0; z-index: 100; }
+    .ah-inner { max-width: 1280px; margin: 0 auto; padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 20px; }
+    .ah-brand { font-size: 12px; font-weight: 700; color: var(--green); letter-spacing: 2px; display: flex; align-items: center; gap: 8px; }
+    .ah-brand-icon { background: var(--green); color: #fff; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+    .ah-nav { display: flex; flex: 1; }
+    .ah-link { font-size: 11px; color: var(--text-3); padding: 16px 14px; display: block; transition: color 0.1s; border-bottom: 2px solid transparent; margin-bottom: -2px; letter-spacing: 0.5px; }
+    .ah-link:hover, .ah-link.active { color: var(--green); border-color: var(--green); }
+    .ah-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+    .ah-email { font-size: 10px; color: var(--text-3); }
+    .ah-live { font-size: 10px; color: var(--blue); padding: 5px 10px; border: 1px solid #bfdbfe; letter-spacing: 0.5px; }
+    .ah-live:hover { background: var(--blue-l); }
+
+    /* Buttons */
+    .btn { font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; padding: 7px 14px; border: 1px solid transparent; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all 0.1s; }
+    .btn-primary { background: var(--green); color: #fff; border-color: var(--green); }
+    .btn-primary:hover { background: #15803d; color: #fff; }
+    .btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--bg); }
+    .btn-danger { background: transparent; color: var(--red); border-color: var(--border); }
+    .btn-danger:hover { background: var(--red-l); border-color: var(--red); }
+
+    /* Content */
+    .awrap { max-width: 1280px; margin: 0 auto; padding: 28px 24px; }
+    .aph { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+    .aph-title { font-size: 16px; font-weight: 700; }
+    .aph-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+
+    /* Stats */
+    .astats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+    .astat { background: var(--white); border: 1px solid var(--border); padding: 16px 24px; min-width: 110px; }
+    .astat-n { font-size: 28px; font-weight: 700; color: var(--green); line-height: 1; }
+    .astat-l { font-size: 9px; color: var(--text-3); letter-spacing: 1.5px; margin-top: 5px; }
+
+    /* Table */
+    .acard { background: var(--white); border: 1px solid var(--border); }
+    .atable { width: 100%; border-collapse: collapse; }
+    .atable th { text-align: left; font-size: 9px; letter-spacing: 2px; color: var(--text-3); padding: 10px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 700; }
+    .atable td { padding: 13px 16px; border-bottom: 1px solid var(--border2); vertical-align: middle; font-size: 12px; }
+    .atable tbody tr:last-child td { border-bottom: none; }
+    .atable tbody tr:hover td { background: #fafafa; }
+    .td-title strong { display: block; font-size: 13px; color: var(--text); }
+    .td-title small { font-size: 11px; color: var(--text-3); display: block; margin-top: 2px; }
+
+    /* Badges */
+    .abadge { font-size: 9px; padding: 2px 7px; border: 1px solid; font-weight: 700; letter-spacing: 0.3px; display: inline-block; }
+    .ab-green { border-color: var(--green-b); color: var(--green); background: var(--green-l); }
+    .ab-amber { border-color: #fcd34d; color: var(--amber); background: var(--amber-l); }
+    .ab-gray  { border-color: var(--border); color: var(--text-3); }
+
+    .aactions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+    /* Empty */
+    .aempty { text-align: center; padding: 60px 20px; color: var(--text-3); }
+
+    /* Logout form */
+    .lf { display: inline; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <span>▶ ADMIN_DASHBOARD // {session.email}</span>
-    <span>
-      <a href="/" target="_blank">[ LIVE_SITE → ]</a>
-      &nbsp;&nbsp;
-      <form method="POST" action="/api/auth/logout" style="display:inline">
-        <button type="submit">[ LOGOUT ]</button>
-      </form>
-    </span>
-  </div>
+  <header class="ah">
+    <div class="ah-inner">
+      <div class="ah-brand">
+        <div class="ah-brand-icon">$_</div>
+        DAILYJOBPOST
+      </div>
+      <nav class="ah-nav">
+        <a href="/admin/dashboard" class="ah-link active">Dashboard</a>
+        <a href="/admin/jobs/new" class="ah-link">+ New Job</a>
+      </nav>
+      <div class="ah-right">
+        <span class="ah-email">{session.email}</span>
+        <a href="/" target="_blank" class="ah-live">↗ Live Site</a>
+        <form class="lf" method="POST" action="/api/auth/logout">
+          <button type="submit" class="btn btn-ghost" style="font-size:10px;padding:5px 10px">Sign out</button>
+        </form>
+      </div>
+    </div>
+  </header>
 
-  <div class="wrap">
-    <div class="page-hdr">
+  <main class="awrap">
+    <div class="aph">
       <div>
-        <div class="page-title">JOB_LISTINGS</div>
-        <div class="page-sub">manage job posts · {jobs.length} total</div>
+        <div class="aph-title">Job Listings</div>
+        <div class="aph-sub">{jobs.length} total posts · manage your job board</div>
       </div>
-      <a href="/admin/jobs/new" class="btn primary">[ + NEW_JOB ]</a>
+      <a href="/admin/jobs/new" class="btn btn-primary">+ New Job</a>
     </div>
 
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-n">{jobs.length}</div>
-        <div class="stat-l">TOTAL</div>
+    <div class="astats">
+      <div class="astat">
+        <div class="astat-n">{jobs.length}</div>
+        <div class="astat-l">TOTAL</div>
       </div>
-      <div class="stat">
-        <div class="stat-n">{jobs.filter(j => j.remote).length}</div>
-        <div class="stat-l">REMOTE</div>
-      </div>
-      <div class="stat">
-        <div class="stat-n">{jobs.filter(j => j.urgent).length}</div>
-        <div class="stat-l">URGENT</div>
+      <div class="astat">
+        <div class="astat-n">{jobs.filter(j => j.remote).length}</div>
+        <div class="astat-l">REMOTE</div>
       </div>
     </div>
 
-    <div class="divider">// ─────────────────────────────────────────────────────────</div>
-
-    {jobs.length === 0 ? (
-      <div class="empty">no jobs yet — click [ + NEW_JOB ] to add the first one</div>
-    ) : (
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>JOB</th>
-            <th>TYPE</th>
-            <th>POSTED</th>
-            <th>ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((job) => (
+    <div class="acard">
+      {jobs.length === 0 ? (
+        <div class="aempty">
+          <div style="font-size:24px;margin-bottom:12px;opacity:0.3">◎</div>
+          <div>No jobs yet.</div>
+          <div style="margin-top:8px"><a href="/admin/jobs/new" class="btn btn-primary" style="margin-top:12px">+ Create first job</a></div>
+        </div>
+      ) : (
+        <table class="atable">
+          <thead>
             <tr>
-              <td style="color:#3a7a3a;font-size:11px">#{job.id}</td>
-              <td class="job-title-cell">
-                <span class="job-title-val">{job.title}</span>
-                <div class="job-co">{job.company} · {job.location}</div>
-              </td>
-              <td>
-                <span class="badge">{job.type.toUpperCase()}</span>
-                {Boolean(job.remote) && <span class="badge remote" style="margin-left:4px">REMOTE</span>}
-                {Boolean(job.urgent) && <span class="badge urgent" style="margin-left:4px">URGENT</span>}
-              </td>
-              <td style="font-size:11px;color:#3a7a3a">{job.posted}</td>
-              <td>
-                <div class="actions">
-                  <a href={`/admin/jobs/${job.id}`} class="btn">[ EDIT ]</a>
-                  <form method="POST" action={`/api/jobs/${job.id}`} onsubmit="return confirm('Delete this job?')">
-                    <input type="hidden" name="_method" value="DELETE" />
-                    <button type="submit" class="btn danger">[ DEL ]</button>
-                  </form>
-                </div>
-              </td>
+              <th style="width:36px">#</th>
+              <th>JOB</th>
+              <th>TYPE</th>
+              <th>POSTED</th>
+              <th style="width:160px">ACTIONS</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-  </div>
+          </thead>
+          <tbody>
+            {jobs.map(job => (
+              <tr>
+                <td style="color:var(--text-3);font-size:11px">{job.id}</td>
+                <td class="td-title">
+                  <strong>{job.title}</strong>
+                  <small>{job.company} · {job.location}</small>
+                </td>
+                <td>
+                  <span class="abadge ab-green">{job.type.toUpperCase()}</span>
+                  {Boolean(job.remote) && <span class="abadge ab-green" style="margin-left:4px">REMOTE</span>}
+                </td>
+                <td style="font-size:11px;color:var(--text-3);white-space:nowrap">{job.posted}</td>
+                <td>
+                  <div class="aactions">
+                    <a href={`/admin/jobs/${job.id}`} class="btn btn-ghost" style="font-size:10px;padding:5px 10px">Edit</a>
+                    <form method="POST" action={`/api/jobs/${job.id}`} onsubmit="return confirm('Delete this job?')" style="display:inline">
+                      <input type="hidden" name="_method" value="DELETE" />
+                      <button type="submit" class="btn btn-danger" style="font-size:10px;padding:5px 10px">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </main>
 </body>
 </html>

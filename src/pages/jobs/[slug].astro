@@ -2,6 +2,7 @@
 export const prerender = false;
 import { marked } from 'marked';
 import Base from '../../layouts/Base.astro';
+import Footer from '../../components/Footer.astro';
 import { rowToJob, type JobRow } from '../../lib/db';
 
 const { slug } = Astro.params;
@@ -11,124 +12,254 @@ const row = await env.DB.prepare('SELECT * FROM jobs WHERE slug = ?').bind(slug)
 if (!row) return Astro.redirect('/');
 
 const job = rowToJob(row);
-const bodyHtml = job.body ? await marked.parse(job.body) : '';
+
+/* Imported jobs store HTML; admin-created jobs store Markdown. Render accordingly. */
+/* Strip structural/container tags — a stray </div> in source HTML can break the
+   page grid (pushing the sidebar below). Keep only safe inline/paragraph tags. */
+function cleanBody(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<\/?(?:div|section|article|header|footer|main|aside|figure|figcaption|table|thead|tbody|tfoot|tr|td|th|colgroup|col|nav|form|button|svg|path|iframe|span)[^>]*>/gi, '')
+    .replace(/(\s*<br\s*\/?>\s*){3,}/gi, '<br><br>')
+    .trim();
+}
+const looksHtml = /<(p|ul|ol|li|h[1-6]|div|br|strong|em|b|i)\b/i.test(job.body);
+const bodyHtml = job.body ? (looksHtml ? cleanBody(job.body) : await marked.parse(job.body)) : '';
+
+const isRemote = job.remote || job.type === 'remote';
+const typeLabel = job.type.toUpperCase().replace('-', '_');
+
+const shareUrl  = `https://dailyjobpost.online/jobs/${job.slug}`;
+const shareText = `${job.title} at ${job.company}`;
+const enc = encodeURIComponent;
+const shareLinks = {
+  x:        `https://twitter.com/intent/tweet?text=${enc(shareText)}&url=${enc(shareUrl)}`,
+  linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${enc(shareUrl)}`,
+  whatsapp: `https://wa.me/?text=${enc(shareText + ' — ' + shareUrl)}`,
+  facebook: `https://www.facebook.com/sharer/sharer.php?u=${enc(shareUrl)}`,
+  telegram: `https://t.me/share/url?url=${enc(shareUrl)}&text=${enc(shareText)}`,
+  email:    `mailto:?subject=${enc(shareText)}&body=${enc('Check out this job: ' + shareUrl)}`,
+};
 
 function initials(company: string): string {
   return company.split(/[\s\-_]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
-
 function daysAgo(posted: string): string {
   const diff = Math.floor((Date.now() - new Date(posted).getTime()) / 86_400_000);
-  if (diff === 0) return 'today';
-  if (diff === 1) return '1d ago';
-  return `${diff}d ago`;
+  if (diff <= 0) return 'today';
+  if (diff === 1) return '1 day ago';
+  if (diff < 7) return `${diff} days ago`;
+  if (diff < 30) return `${Math.floor(diff / 7)} weeks ago`;
+  return `${Math.floor(diff / 30)} months ago`;
 }
-
-const typeLabel = job.type.toUpperCase().replace('-', '_');
 
 const employmentTypeMap: Record<string, string> = {
   'full-time': 'FULL_TIME', 'part-time': 'PART_TIME',
   'contract': 'CONTRACTOR', 'remote': 'FULL_TIME', 'internship': 'INTERN',
 };
 
+const postedDate = job.posted;
+const validThrough = new Date(new Date(job.posted).getTime() + 45 * 86_400_000).toISOString().split('T')[0];
+
 const jobLd: Record<string, unknown> = {
   "@context": "https://schema.org",
   "@type": "JobPosting",
   "title": job.title,
-  "description": `${job.title} at ${job.company}. ${job.location}. ${job.salary ?? ''}`,
-  "datePosted": job.posted,
-  "hiringOrganization": { "@type": "Organization", "name": job.company },
-  "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location } },
+  "description": job.body || `${job.title} at ${job.company}. ${job.location}. ${job.salary ?? ''}`,
+  "datePosted": postedDate,
+  "validThrough": validThrough,
   "employmentType": employmentTypeMap[job.type] ?? 'OTHER',
-  "url": `https://dailyjobpost.online/jobs/${job.slug}`,
+  "identifier": { "@type": "PropertyValue", "name": job.company, "value": String(job.id) },
+  "hiringOrganization": { "@type": "Organization", "name": job.company },
+  "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location, "addressCountry": "Worldwide" } },
+  "url": shareUrl,
+  "directApply": false,
 };
-if (job.remote || job.type === 'remote') jobLd["jobLocationType"] = "TELECOMMUTE";
-if (job.applyUrl) jobLd["url"] = job.applyUrl;
+if (isRemote) {
+  jobLd["jobLocationType"] = "TELECOMMUTE";
+  jobLd["applicantLocationRequirements"] = { "@type": "Country", "name": job.location.replace(/remote\s*[-–,]?\s*/i, '').trim() || "Anywhere" };
+}
+
+const breadcrumbLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Jobs", "item": "https://dailyjobpost.online/" },
+    ...(job.category ? [{ "@type": "ListItem", "position": 2, "name": job.category, "item": `https://dailyjobpost.online/?category=${encodeURIComponent(job.category)}` }] : []),
+    { "@type": "ListItem", "position": job.category ? 3 : 2, "name": job.title, "item": shareUrl },
+  ],
+});
 ---
 
 <Base
-  title={`${job.title} @ ${job.company} — dailyjobpost.online`}
+  title={`${job.title} at ${job.company} — dailyjobpost.online`}
   description={`${job.title} at ${job.company}. ${job.location}. ${job.salary ?? ''}. Apply now on dailyjobpost.online.`}
+  canonical={shareUrl}
 >
   <script slot="head" type="application/ld+json" is:inline set:html={JSON.stringify(jobLd)} />
+  <script slot="head" type="application/ld+json" is:inline set:html={breadcrumbLd} />
 
-  <div class="detail-wrap">
+  <script is:inline define:vars={{
+    jobId: String(job.id), title: job.title, company: job.company,
+    category: job.category ?? '', jobType: job.type,
+    remote: !!(job.remote || job.type === 'remote'),
+    salary: job.salary ?? '', location: job.location
+  }}>
+    window.__iuPageEvent = { name: 'Job Viewed', props: {
+      job_id: jobId, title, company, category, type: jobType, remote, salary, location
+    } };
+  </script>
 
-    <a href="/" class="back-link">← BACK_TO_JOBS</a>
+  <div class="job-detail">
 
-    <div class="detail-card">
-      <div class="detail-card-hdr">
-        <span>▶ JOB_POSTING // {typeLabel}{job.remote || job.type === 'remote' ? ' // REMOTE' : ''}</span>
-        {job.urgent && <span class="hdr-urgent">[URGENT_HIRE]</span>}
+    <div class="job-detail-head">
+      <a href="/" class="job-detail-back" id="backLink">← BACK_TO_JOBS</a>
+
+      <div class="job-detail-logo-row">
+        <div class="job-detail-logo">{initials(job.company)}</div>
+        <div>
+          <h1 class="job-detail-title">{job.title}</h1>
+          <div class="job-detail-meta">
+            <span class="job-detail-company">{job.company}</span>
+            <span class="job-detail-meta-sep">·</span>
+            <span>{job.location}</span>
+            {job.salary && <><span class="job-detail-meta-sep">·</span><span class="job-detail-salary">{job.salary}</span></>}
+            <span class="job-detail-meta-sep">·</span>
+            <span>posted {daysAgo(job.posted)}</span>
+          </div>
+        </div>
       </div>
 
-      <div class="detail-card-body">
-        <div class="detail-top">
-          <div class={`detail-logo${job.urgent ? ' detail-logo--urgent' : ''}`}>{initials(job.company)}</div>
-          <div class="detail-top-text">
-            <h1 class="detail-title">{job.title}</h1>
-            <div class="detail-company">{job.company}</div>
-            <div class="detail-posted">posted {daysAgo(job.posted)}</div>
-          </div>
-        </div>
-
-        <div class="detail-divider">─────────────────────────────────────────────────────</div>
-
-        <div class="detail-badges">
-          <span class="badge badge--ok">{typeLabel}</span>
-          {job.urgent && <span class="badge badge--warn">URGENT</span>}
-          {(job.remote || job.type === 'remote') && <span class="badge badge--ok">REMOTE</span>}
-        </div>
-
-        <div class="detail-meta-grid">
-          <div class="detail-meta-item">
-            <span class="detail-meta-lbl">LOCATION</span>
-            <span class="detail-meta-val">📍 {job.location}</span>
-          </div>
-          {job.salary && (
-            <div class="detail-meta-item">
-              <span class="detail-meta-lbl">SALARY</span>
-              <span class="detail-meta-val detail-salary">{job.salary}</span>
-            </div>
-          )}
-          {job.experience && (
-            <div class="detail-meta-item">
-              <span class="detail-meta-lbl">EXPERIENCE</span>
-              <span class="detail-meta-val">{job.experience}</span>
-            </div>
-          )}
-        </div>
-
-        {job.tags.length > 0 && (
-          <div class="job-tags">
-            {job.tags.map((tag) => <span class="job-tag">{tag}</span>)}
-          </div>
-        )}
-
-        <div class="detail-divider">─────────────────────────────────────────────────────</div>
+      <div class="job-detail-badges">
+        <span class="badge badge--dim">{typeLabel}</span>
+        {isRemote   && <span class="badge badge--remote">REMOTE</span>}
+        {job.category && <span class="badge badge--dim">{job.category}</span>}
       </div>
+
+      {job.tags.length > 0 && (
+        <div class="job-detail-tags">
+          {job.tags.map((tag) => <span class="job-tag">{tag}</span>)}
+        </div>
+      )}
     </div>
 
-    <div class="detail-desc">
-      <div class="detail-desc-hdr">▶ JOB_DESCRIPTION</div>
-      <div class="detail-divider" style="margin-top: 0;">──────────────────────────────────────────────────────────────</div>
-      <div class="md-content" set:html={bodyHtml} />
+    <div class="job-detail-layout">
+
+      <div class="job-detail-main">
+        <div class="job-detail-section-label">▶ JOB_DESCRIPTION</div>
+        {bodyHtml
+          ? <div class="job-detail-body" set:html={bodyHtml} />
+          : <div class="job-detail-body"><p>No description provided. Click apply to view the full posting on {job.company}'s site.</p></div>
+        }
+      </div>
+
+      <aside class="job-detail-sidebar">
+        <div class="job-sidebar-card">
+          <div class="job-sidebar-card-head">▶ COMPANY_DETAILS</div>
+          <div class="job-sidebar-card-body">
+            <div class="job-sidebar-row"><span class="job-sidebar-label">Company</span><span class="job-sidebar-val">{job.company}</span></div>
+            <div class="job-sidebar-row"><span class="job-sidebar-label">Location</span><span class="job-sidebar-val">{job.location}</span></div>
+            <div class="job-sidebar-row"><span class="job-sidebar-label">Type</span><span class="job-sidebar-val">{typeLabel}</span></div>
+            {job.category && (<div class="job-sidebar-row"><span class="job-sidebar-label">Category</span><span class="job-sidebar-val">{job.category}</span></div>)}
+            {job.salary && (<div class="job-sidebar-row"><span class="job-sidebar-label">Salary</span><span class="job-sidebar-val">{job.salary}</span></div>)}
+            {job.experience && (<div class="job-sidebar-row"><span class="job-sidebar-label">Experience</span><span class="job-sidebar-val">{job.experience}</span></div>)}
+            <div class="job-sidebar-row"><span class="job-sidebar-label">Posted</span><span class="job-sidebar-val">{job.posted}</span></div>
+            <div class="job-sidebar-row"><span class="job-sidebar-label">Remote</span><span class="job-sidebar-val">{isRemote ? 'Yes' : 'No'}</span></div>
+          </div>
+        </div>
+
+        <div class="job-sidebar-card">
+          <div class="job-sidebar-card-head">▶ APPLY</div>
+          <div class="job-sidebar-card-body">
+            {job.applyUrl ? (
+              <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" class="job-apply-btn"
+                data-iu-event="Apply Clicked"
+                data-iu-job-id={String(job.id)}
+                data-iu-title={job.title}
+                data-iu-company={job.company}
+                data-iu-category={job.category ?? ''}
+                data-iu-apply_url={job.applyUrl}>APPLY NOW →</a>
+            ) : (
+              <div style="font-size:11px;color:var(--text-3)">No direct link — search "{job.title}" on {job.company}'s careers page.</div>
+            )}
+            <div style="font-size:10px;color:var(--text-3);margin-top:10px;text-align:center">opens {job.company}'s official posting</div>
+          </div>
+        </div>
+
+        <div class="job-sidebar-card">
+          <div class="job-sidebar-card-head">▶ SHARE</div>
+          <div class="job-sidebar-card-body">
+            <div class="share-grid">
+              <a class="share-btn share-btn--wa" href={shareLinks.whatsapp} target="_blank" rel="noopener" aria-label="Share on WhatsApp">
+                <svg class="share-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                <span>WhatsApp</span>
+              </a>
+              <a class="share-btn share-btn--li" href={shareLinks.linkedin} target="_blank" rel="noopener" aria-label="Share on LinkedIn">
+                <svg class="share-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                <span>LinkedIn</span>
+              </a>
+              <a class="share-btn share-btn--x" href={shareLinks.x} target="_blank" rel="noopener" aria-label="Share on X">
+                <svg class="share-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <span>X</span>
+              </a>
+              <a class="share-btn share-btn--tg" href={shareLinks.telegram} target="_blank" rel="noopener" aria-label="Share on Telegram">
+                <svg class="share-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                <span>Telegram</span>
+              </a>
+              <a class="share-btn share-btn--fb" href={shareLinks.facebook} target="_blank" rel="noopener" aria-label="Share on Facebook">
+                <svg class="share-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                <span>Facebook</span>
+              </a>
+              <a class="share-btn share-btn--em" href={shareLinks.email} aria-label="Share by email">
+                <svg class="share-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1.5 8.67v8.58a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3V8.67l-8.928 5.493a3 3 0 0 1-3.144 0L1.5 8.67Z"/><path d="M22.5 6.908V6.75a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3v.158l9.714 5.978a1.5 1.5 0 0 0 1.572 0L22.5 6.908Z"/></svg>
+                <span>Email</span>
+              </a>
+            </div>
+            <button type="button" class="share-copy" id="shareCopy" data-url={shareUrl}>⧉ COPY LINK</button>
+            <button type="button" class="share-native" id="shareNative" data-url={shareUrl} data-title={shareText} hidden>↗ SHARE…</button>
+          </div>
+        </div>
+
+      </aside>
+
     </div>
-
-    {job.applyUrl ? (
-      <div class="detail-apply-bottom">
-        <span class="detail-apply-bottom-lbl">READY TO APPLY? DON'T MISS THIS OPPORTUNITY.</span>
-        <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" class="detail-apply-cta">
-          [ APPLY_NOW → ]
-        </a>
-      </div>
-    ) : (
-      <div class="detail-apply-bottom">
-        <span class="detail-apply-bottom-lbl">no direct apply link — contact {job.company} directly</span>
-      </div>
-    )}
-
-    <a href="/" class="back-link" style="margin-top: 8px; display: inline-block;">← BACK_TO_JOBS</a>
 
   </div>
+
+  <Footer />
+
+  <script is:inline>
+    (function () {
+      // Back to the exact list (filters + scroll) when arriving from our own site
+      var back = document.getElementById('backLink');
+      if (back) {
+        try {
+          var ref = document.referrer ? new URL(document.referrer) : null;
+          if (ref && ref.origin === location.origin && ref.pathname !== location.pathname) {
+            back.addEventListener('click', function (e) { e.preventDefault(); history.back(); });
+          }
+        } catch (e) {}
+      }
+
+      var copyBtn = document.getElementById('shareCopy');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', function () {
+          navigator.clipboard.writeText(copyBtn.getAttribute('data-url')).then(function () {
+            var old = copyBtn.textContent;
+            copyBtn.textContent = '✓ COPIED!';
+            copyBtn.classList.add('share-copy--done');
+            setTimeout(function () { copyBtn.textContent = old; copyBtn.classList.remove('share-copy--done'); }, 1800);
+          });
+        });
+      }
+      var nativeBtn = document.getElementById('shareNative');
+      if (nativeBtn && navigator.share) {
+        nativeBtn.hidden = false;
+        nativeBtn.addEventListener('click', function () {
+          navigator.share({ title: nativeBtn.getAttribute('data-title'), url: nativeBtn.getAttribute('data-url') }).catch(function () {});
+        });
+      }
+    })();
+  </script>
 </Base>

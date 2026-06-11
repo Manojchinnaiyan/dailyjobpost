@@ -5,14 +5,14 @@ import { SESSION_COOKIE, getSession } from '../../lib/auth';
 const { env } = Astro.locals.runtime;
 const sid = Astro.cookies.get(SESSION_COOKIE)?.value;
 const session = await getSession(env.DB, sid);
-if (session) return Astro.redirect('/admin/dashboard');
+if (session?.role === 'admin') return Astro.redirect('/admin/dashboard');
 
 const error = Astro.url.searchParams.get('error');
 const errorMsg: Record<string, string> = {
-  state:        '[ERR] OAuth state mismatch — try again',
-  token:        '[ERR] Failed to exchange token with Google',
-  userinfo:     '[ERR] Failed to retrieve Google profile',
-  unauthorized: '[ERR] Access denied — this account is not authorized',
+  state:        'OAuth state mismatch — please try again.',
+  token:        'Failed to exchange token with Google.',
+  userinfo:     'Failed to retrieve your Google profile.',
+  unauthorized: 'This Google account is not authorized as admin.',
 };
 ---
 <!doctype html>
@@ -25,31 +25,61 @@ const errorMsg: Record<string, string> = {
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
-    body { background: #0a0a0a; color: #33ff00; font-family: 'JetBrains Mono', monospace; font-size: 13px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .box { border: 1px solid #1f521f; width: 100%; max-width: 420px; }
-    .box-hdr { background: #1f521f; color: #0a0a0a; padding: 6px 12px; font-size: 11px; letter-spacing: 2px; font-weight: 700; }
-    .box-body { padding: 32px 24px; display: flex; flex-direction: column; gap: 20px; }
-    .prompt-line { color: #ffb000; font-size: 12px; }
-    .cmd { color: #33ff00; text-shadow: 0 0 6px rgba(51,255,0,0.45); }
-    .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: transparent; border: 1px solid #3a7a3a; color: #33ff00; font-family: inherit; font-size: 12px; padding: 10px 20px; cursor: pointer; letter-spacing: 1px; text-decoration: none; transition: background 0.15s; }
-    .btn-google:hover { background: #33ff00; color: #0a0a0a; border-color: #33ff00; }
-    .error { color: #ff3333; font-size: 11px; letter-spacing: 1px; }
-    .muted { color: #3a7a3a; font-size: 11px; }
+    :root {
+      --bg: #f1f5f9; --white: #ffffff; --border: #e2e8f0; --text: #0f172a;
+      --text-2: #475569; --text-3: #94a3b8; --green: #16a34a; --green-l: #f0fdf4;
+      --red: #dc2626; --red-l: #fef2f2; --font: 'JetBrains Mono', monospace;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: var(--white); border: 1px solid var(--border); width: 100%; max-width: 400px; }
+    .card-head { background: var(--green); color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 10px; }
+    .card-head-icon { font-size: 16px; font-weight: 700; }
+    .card-head-title { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; }
+    .card-body { padding: 28px 24px; display: flex; flex-direction: column; gap: 20px; }
+    .login-prompt { font-size: 11px; color: var(--text-3); font-style: italic; }
+    .login-prompt span { color: var(--text-2); font-style: normal; }
+    .google-btn {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      background: var(--white); border: 1px solid var(--border); color: var(--text);
+      font-family: var(--font); font-size: 12px; padding: 12px 20px; cursor: pointer;
+      text-decoration: none; font-weight: 700; letter-spacing: 0.5px;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .google-btn:hover { background: var(--green-l); border-color: var(--green); color: var(--green); }
+    .google-icon { width: 18px; height: 18px; flex-shrink: 0; }
+    .error-box { background: var(--red-l); border: 1px solid #fca5a5; color: var(--red); font-size: 11px; padding: 10px 14px; }
+    .card-foot { border-top: 1px solid var(--border); padding: 12px 20px; font-size: 10px; color: var(--text-3); text-align: center; letter-spacing: 0.5px; }
   </style>
 </head>
 <body>
-  <div class="box">
-    <div class="box-hdr">▶ ADMIN_ACCESS // dailyjobpost.online</div>
-    <div class="box-body">
-      <div>
-        <div class="prompt-line">user@dailyjobpost:~$ <span class="cmd">sudo auth --provider=google</span></div>
-      </div>
-      {error && <div class="error">{errorMsg[error] ?? '[ERR] Authentication failed'}</div>}
-      <a href="/api/auth/google" class="btn-google">
-        [ SIGN IN WITH GOOGLE → ]
-      </a>
-      <div class="muted">access restricted to authorized administrators only</div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-head-icon">$_</span>
+      <span class="card-head-title">DAILYJOBPOST ADMIN</span>
     </div>
+    <div class="card-body">
+      <div class="login-prompt">
+        <span>$ sudo auth</span> --provider=google --scope=admin
+      </div>
+
+      {error && (
+        <div class="error-box">
+          [ERR] {errorMsg[error] ?? 'Authentication failed. Please try again.'}
+        </div>
+      )}
+
+      <a href="/api/auth/google" class="google-btn">
+        <svg class="google-icon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/>
+          <path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </a>
+
+    </div>
+    <div class="card-foot">access restricted to authorized administrators only</div>
   </div>
 </body>
 </html>

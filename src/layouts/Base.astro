@@ -1,17 +1,41 @@
 ---
 import '../styles/global.css';
+import { SESSION_COOKIE, getSession } from '../lib/auth';
 
 export interface Props {
   title?: string;
   description?: string;
+  noindex?: boolean;
+  canonical?: string;
+  ogType?: string;
+  image?: string;
 }
 
 const {
   title       = 'dailyjobpost.online — Find Your Dream Job',
-  description = 'Discover remote & on-site engineering jobs. Terminal-style job board. Updated daily.',
+  description = 'Discover remote & on-site jobs worldwide. Updated daily.',
+  noindex     = false,
+  canonical,
+  ogType      = 'website',
+  image       = 'https://dailyjobpost.online/og.png',
 } = Astro.props;
 
 const path = Astro.url.pathname;
+const canonicalUrl = canonical ?? `https://dailyjobpost.online${path}`;
+
+const orgLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "dailyjobpost.online",
+  "url": "https://dailyjobpost.online",
+  "logo": "https://dailyjobpost.online/favicon.svg",
+  "description": "A daily-updated global job board across every industry.",
+});
+
+const { env } = Astro.locals.runtime;
+const sid     = Astro.cookies.get(SESSION_COOKIE)?.value;
+const session = await getSession(env.DB, sid);
+const userEmail = session ? session.email : null;
 ---
 
 <!doctype html>
@@ -20,152 +44,187 @@ const path = Astro.url.pathname;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content={description} />
-    <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#0a0a0a" />
-    <!-- Canonical -->
-    <link rel="canonical" href={Astro.url.href} />
-    <!-- Open Graph -->
-    <meta property="og:type"        content="website" />
-    <meta property="og:url"         content={Astro.url.href} />
+    <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow'} />
+    <meta name="googlebot" content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1'} />
+    <meta name="theme-color" content="#09090b" />
+    <meta name="msvalidate.01" content="FDB6C8A4D4E9A23776D3704FEB2E25AF" />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:type"        content={ogType} />
+    <meta property="og:url"         content={canonicalUrl} />
     <meta property="og:title"       content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:site_name"   content="dailyjobpost.online" />
-    <!-- Twitter Card -->
-    <meta name="twitter:card"        content="summary" />
+    <meta property="og:locale"      content="en_US" />
+    <meta property="og:image"       content={image} />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="dailyjobpost.online — find jobs worldwide" />
+    <meta name="twitter:card"        content="summary_large_image" />
     <meta name="twitter:title"       content={title} />
     <meta name="twitter:description" content={description} />
+    <meta name="twitter:image"       content={image} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+    <script type="application/ld+json" is:inline set:html={orgLd} />
+
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EY27FD5VWR"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-EY27FD5VWR');
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3177564979156582" crossorigin="anonymous"></script>
     <slot name="head" />
-    <!-- Prevent flash of wrong theme -->
     <script is:inline>
       (function() {
         var stored = localStorage.getItem('theme');
-        if (stored === 'light') {
+        if (stored === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        else if (!stored && window.matchMedia('(prefers-color-scheme: light)').matches)
           document.documentElement.setAttribute('data-theme', 'light');
-        } else if (!stored && window.matchMedia('(prefers-color-scheme: light)').matches) {
-          document.documentElement.setAttribute('data-theme', 'light');
-        }
       })();
     </script>
-
-    <!-- InspectUser analytics — init only; full autocapture (pageviews, clicks,
-         scroll, sessions, web vitals, JS errors) runs automatically. -->
     <script>
-      import { init } from '../lib/inspectuser.mjs';
+      import { init, track } from '../lib/inspectuser.mjs';
       init({
-        // Publishable ingestion (write) key — safe to ship in the browser bundle.
         apiKey: 'amp_ecb35af15911cb441936a55751956ce5604c95883ddfc4eb518590a39310aefe',
         serverUrl: 'https://ingest.inspectuser.com',
-        // Session replay: record all sessions, inputs masked (PII-safe). rrweb is
-        // bundled in the SDK; chunks upload to the /replay endpoint on the API host.
-        sessionReplay: { enabled: true, serverUrl: 'https://api.inspectuser.com' },
+        sessionReplay: {
+          enabled: true,
+          serverUrl: 'https://api.inspectuser.com',
+          sampleRate: 0.3,                       // record ~30% of sessions (cuts replay CPU/data ~70%)
+          blockSelector: '.no-record, ins.adsbygoogle, .in-feed-ad, .ad-slot-inner, .ad-slot-outer, iframe',
+        },
       });
+
+      // ── Custom analytics (funnel: Search → Job Viewed → Apply) ──────────
+      // Any element with data-iu-event fires that event; its data-iu-* attrs
+      // become the event properties.
+      const propsFrom = (el) => {
+        const p = {};
+        for (const a of el.attributes) {
+          if (a.name.startsWith('data-iu-') && a.name !== 'data-iu-event') {
+            const v = a.value;
+            p[a.name.slice(8).replace(/-/g, '_')] = v;
+          }
+        }
+        return p;
+      };
+
+      document.addEventListener('click', (e) => {
+        const tagged = e.target.closest('[data-iu-event]');
+        if (tagged) track(tagged.getAttribute('data-iu-event'), propsFrom(tagged));
+        const share = e.target.closest('.share-btn');
+        if (share && !(tagged && tagged.classList.contains('share-btn'))) {
+          const label = (share.getAttribute('aria-label') || '').replace(/^share on /i, '').trim();
+          track('Job Shared', { platform: label || 'unknown', ...propsFrom(share) });
+        }
+      }, true);
+
+      // Search (hero + filter bar)
+      document.querySelectorAll('form.hero-search, form.filter-bar').forEach((f) => {
+        f.addEventListener('submit', () => {
+          const q = (f.querySelector('input[name="q"]') || {}).value || '';
+          track('Job Searched', { query: q.trim(), source: f.classList.contains('hero-search') ? 'hero' : 'filter' });
+        });
+      });
+
+      // Job-alert subscribe
+      const af = document.querySelector('form.alert-form');
+      if (af) af.addEventListener('submit', () => {
+        const email = (af.querySelector('input[type="email"]') || {}).value || '';
+        track('Job Alert Subscribed', { email_domain: email.includes('@') ? email.split('@')[1] : '' });
+      });
+
+      // Page-declared event (e.g. Job Viewed), set inline by the page first.
+      if (window.__iuPageEvent) track(window.__iuPageEvent.name, window.__iuPageEvent.props);
     </script>
   </head>
   <body>
 
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!--  NAVBAR                                                -->
-    <!-- ══════════════════════════════════════════════════════ -->
     <nav class="navbar">
       <div class="nav-inner">
 
-        <!-- Logo -->
         <a href="/" class="nav-logo">
           <span class="nav-logo-icon">$_</span>
           <span class="nav-logo-text">DAILYJOBPOST</span>
         </a>
 
-        <!-- Desktop links -->
         <div class="nav-links" id="navLinks">
           <a href="/"            data-nav="" class={`nav-link${path === '/' ? ' active' : ''}`}>All Jobs</a>
-          <a href="/remote"      target="_blank" rel="noopener" class={`nav-link${path.startsWith('/remote') ? ' active' : ''}`}>Remote</a>
-          <a href="/internships" target="_blank" rel="noopener" class={`nav-link${path.startsWith('/internships') ? ' active' : ''}`}>Internships</a>
+          <a href="/remote"      class={`nav-link${path.startsWith('/remote') ? ' active' : ''}`}>Remote</a>
+          <a href="/internships" class={`nav-link${path.startsWith('/internships') ? ' active' : ''}`}>Internships</a>
+          <a href="/guides"      class={`nav-link${path.startsWith('/guides') ? ' active' : ''}`}>Guides</a>
+          <a href="/about"       class={`nav-link${path.startsWith('/about') ? ' active' : ''}`}>About</a>
         </div>
 
-        <!-- Right side -->
         <div class="nav-right">
-          <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark theme" title="Toggle theme">◐</button>
+          {userEmail ? (
+            <div class="nav-user">
+              <span class="nav-user-name">{userEmail.split('@')[0]}</span>
+              <form method="POST" action="/api/auth/user-logout" style="display:inline">
+                <button type="submit" class="nav-user-logout">logout</button>
+              </form>
+            </div>
+          ) : (
+            <a href="/api/auth/user-login" class="nav-signin">[ SIGN IN ]</a>
+          )}
+          <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">◐</button>
           <button class="nav-toggle" id="navToggle" aria-label="Open menu">&#9776;</button>
         </div>
 
       </div>
 
-      <!-- Mobile drawer -->
       <div class="nav-drawer" id="navDrawer">
-        <a href="/"            data-nav=""                         class="drawer-link">All Jobs</a>
-        <a href="/remote"      target="_blank" rel="noopener"      class="drawer-link">Remote</a>
-        <a href="/internships" target="_blank" rel="noopener"      class="drawer-link">Internships</a>
+        <a href="/"            data-nav="" class="drawer-link">All Jobs</a>
+        <a href="/remote"      class="drawer-link">Remote</a>
+        <a href="/internships" class="drawer-link">Internships</a>
+        <a href="/guides"      class="drawer-link">Guides</a>
+        <a href="/about"       class="drawer-link">About</a>
+        <a href="/privacy"     class="drawer-link">Privacy</a>
+        {userEmail ? (
+          <form method="POST" action="/api/auth/user-logout">
+            <button type="submit" class="drawer-link drawer-link--btn">Sign out ({userEmail.split('@')[0]})</button>
+          </form>
+        ) : (
+          <a href="/api/auth/user-login" class="drawer-link">Sign In</a>
+        )}
       </div>
     </nav>
 
     <slot />
 
-    <!-- Back to top -->
     <button id="btt" class="back-to-top" aria-label="Back to top">↑</button>
 
     <script>
-      /* ── Theme toggle ──────────────────────────────────── */
       (function () {
         const btn = document.getElementById('themeToggle');
-        function applyTheme(light: boolean, save = true) {
+        function applyTheme(light: boolean) {
           if (light) {
             document.documentElement.setAttribute('data-theme', 'light');
-            if (save) localStorage.setItem('theme', 'light');
+            localStorage.setItem('theme', 'light');
           } else {
             document.documentElement.removeAttribute('data-theme');
-            if (save) localStorage.setItem('theme', 'dark');
+            localStorage.setItem('theme', 'dark');
           }
         }
         btn?.addEventListener('click', () => {
-          const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-          applyTheme(!isLight);
+          applyTheme(document.documentElement.getAttribute('data-theme') !== 'light');
         });
-        /* Follow system theme changes when user has no stored preference */
-        const mq = window.matchMedia('(prefers-color-scheme: light)');
-        mq.addEventListener('change', (e) => {
-          if (!localStorage.getItem('theme')) applyTheme(e.matches, false);
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+          if (!localStorage.getItem('theme')) applyTheme(e.matches);
         });
       })();
 
-      /* ── Mobile toggle ─────────────────────────────────── */
       document.getElementById('navToggle')?.addEventListener('click', () => {
         document.getElementById('navDrawer')?.classList.toggle('open');
       });
 
-      /* ── Hero search form ──────────────────────────────── */
-      document.getElementById('heroForm')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const q = (document.getElementById('heroQ') as HTMLInputElement)?.value.trim() || '';
-        if (q) {
-          window.dispatchEvent(new CustomEvent('hero-search', { detail: { q } }));
-          document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth' });
-        }
-      });
-
-      /* ── Popular chips & nav filter links ──────────────── */
-      document.querySelectorAll('[data-search], [data-nav]').forEach((el) => {
-        el.addEventListener('click', (e) => {
-          e.preventDefault();
-          const raw = (el as HTMLElement).dataset.search ?? (el as HTMLElement).dataset.nav ?? '';
-          const q = raw.trim();
-          window.dispatchEvent(new CustomEvent('hero-search', { detail: { q } }));
-          if (window.location.pathname !== '/') {
-            window.location.href = q ? '/?q=' + encodeURIComponent(q) : '/';
-            return;
-          }
-          document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth' });
-        });
-      });
-
-      /* ── Back to top ──────────────────────────────────── */
       const btt = document.getElementById('btt');
       window.addEventListener('scroll', () => {
         btt?.classList.toggle('visible', window.scrollY > 400);

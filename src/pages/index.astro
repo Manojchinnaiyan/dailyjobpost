@@ -1,172 +1,223 @@
 ---
 export const prerender = false;
 import Base from '../layouts/Base.astro';
-import JobList from '../components/JobList';
-import type { Job } from '../components/JobList';
-import { rowToJob, type JobRow } from '../lib/db';
+import Footer from '../components/Footer.astro';
+import JobResults from '../components/JobResults.astro';
+import { queryJobs, filtersFromUrl, pageHref } from '../lib/jobquery';
+import { getHomeStats, CATEGORIES, COUNTRY_META } from '../lib/homestats';
+import { AD_CLIENT, AD_SLOTS } from '../lib/ads';
 
 const { env } = Astro.locals.runtime;
-const result = await env.DB.prepare('SELECT * FROM jobs ORDER BY posted DESC, created_at DESC').all<JobRow>();
-const jobs: Job[] = (result.results ?? []).map(rowToJob);
+const filters = filtersFromUrl(Astro.url);
 
-// JSON-LD
+// Page of results (filtered + paginated, no body shipped to client)
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+
+// Browse counts — cached in-memory (recomputed at most once per 10 min)
+const { grandTotal, remoteCount, newThisWeek, categoryStats, countryStats } = await getHomeStats(env.DB);
+
+const POSTED_LABELS: Record<string, string> = { '1': 'past 24 hours', '3': 'past 3 days', '7': 'past week', '14': 'past 2 weeks', '30': 'past month' };
+const hasFilter = !!(filters.q || filters.type || filters.category || filters.country || filters.posted);
+const activeLabel = filters.q ? `"${filters.q}"` : filters.category || filters.country || (filters.type ? `--${filters.type}` : '') || (filters.posted ? POSTED_LABELS[filters.posted] : '');
+
 const jsonLd = JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "dailyjobpost.online",
-  "url": "https://dailyjobpost.online",
-  "description": "Find remote and on-site engineering jobs. Updated daily.",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": { "@type": "EntryPoint", "urlTemplate": "https://dailyjobpost.online/?q={search_term_string}" },
-    "query-input": "required name=search_term_string"
-  }
+  "@context": "https://schema.org", "@type": "WebSite",
+  "name": "dailyjobpost.online", "url": "https://dailyjobpost.online",
+  "description": "Find jobs worldwide across every industry. New listings posted daily.",
+  "potentialAction": { "@type": "SearchAction", "target": { "@type": "EntryPoint", "urlTemplate": "https://dailyjobpost.online/?q={search_term_string}" }, "query-input": "required name=search_term_string" }
 });
+
+/* ── Dynamic SEO per active facet ── */
+let seoTitle = 'dailyjobpost.online — Find Jobs Worldwide, Updated Daily';
+let seoDesc  = 'Search thousands of jobs across every industry and country. Software, marketing, finance, design, healthcare and more. New roles posted daily.';
+if (filters.category) {
+  seoTitle = `${filters.category} Jobs — ${total.toLocaleString()} Open Roles | dailyjobpost.online`;
+  seoDesc  = `Browse ${total.toLocaleString()} ${filters.category} jobs worldwide. Apply to roles updated daily on dailyjobpost.online.`;
+} else if (filters.country) {
+  seoTitle = `Jobs in ${filters.country} — ${total.toLocaleString()} Openings | dailyjobpost.online`;
+  seoDesc  = `Find ${total.toLocaleString()} jobs in ${filters.country} across every industry. Updated daily on dailyjobpost.online.`;
+} else if (filters.type) {
+  seoTitle = `${filters.type.replace('-', ' ')} Jobs — dailyjobpost.online`;
+  seoDesc  = `Browse ${total.toLocaleString()} ${filters.type.replace('-', ' ')} jobs worldwide, updated daily.`;
+} else if (filters.q) {
+  seoTitle = `"${filters.q}" Jobs — dailyjobpost.online`;
+  seoDesc  = `${total.toLocaleString()} jobs matching "${filters.q}". Updated daily on dailyjobpost.online.`;
+}
+
+/* Canonical: collapse free-text search + pagination; keep one facet. noindex raw searches. */
+const canonParams = new URLSearchParams();
+if (filters.category)      canonParams.set('category', filters.category);
+else if (filters.country)  canonParams.set('country', filters.country);
+else if (filters.type)     canonParams.set('type', filters.type);
+const seoCanonical = 'https://dailyjobpost.online/' + (canonParams.toString() ? `?${canonParams.toString()}` : '');
+const seoNoindex = !!filters.q;
 ---
 
-<Base
-  title="dailyjobpost.online — Find Engineering Jobs"
-  description="Find remote and on-site engineering jobs. Updated daily. Terminal-style job board."
->
+<Base title={seoTitle} description={seoDesc} canonical={seoCanonical} noindex={seoNoindex}>
   <script slot="head" type="application/ld+json" is:inline set:html={jsonLd} />
 
   <!-- ── Hero ──────────────────────────────────────────── -->
   <section class="hero">
-    <div class="hero-layout">
-
-      <!-- LEFT — copy + quick chips ───────────────────── -->
-      <div class="hero-left">
-        <p class="hero-eyebrow">engineering job board</p>
-
-        <h1 class="hero-title">
-          Find Your<br />
-          <span class="hero-title-accent">Dream Job</span><span class="hero-cursor">_</span>
-        </h1>
-
-        <p class="hero-sub">
-          Remote &amp; on-site engineering roles from top companies.
-          Filter by role, salary, and experience level.
-        </p>
-
-        <form class="hero-search" id="heroForm" action="#jobs">
-          <span class="hero-prompt">$</span>
-          <input
-            id="heroQ"
-            class="hero-input"
-            type="text"
-            placeholder="Search job title, skill, or company..."
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <span class="hero-cursor-inline"></span>
-          <button type="submit" class="hero-search-btn btn btn-primary">
-            [ SEARCH ]
-          </button>
-        </form>
-
-        <div class="hero-popular">
-          <span class="popular-label">try:</span>
-          <a href="#jobs" class="popular-tag" data-search="Go">Go</a>
-          <a href="#jobs" class="popular-tag" data-search="Python">Python</a>
-          <a href="#jobs" class="popular-tag" data-search="React">React</a>
-          <a href="#jobs" class="popular-tag" data-search="Swift">Swift</a>
-          <a href="#jobs" class="popular-tag" data-search="remote">Remote</a>
-          <a href="#jobs" class="popular-tag" data-search="urgent">Urgent</a>
-        </div>
+    <div class="hero-inner">
+      <div class="hero-cmd-row">
+        <span class="hero-ps1">user@dailyjobpost:~$</span>
+        <span class="hero-cmd-text"> find /jobs --worldwide --sort=latest</span>
+        <span class="hero-blink">▋</span>
       </div>
 
-      <!-- RIGHT — terminal window ──────────────────────── -->
-      <div class="hero-right" aria-hidden="true">
-        <div class="term-win">
-          <div class="term-win-bar">
-            <div class="term-win-dots">
-              <span class="term-dot term-dot--red"></span>
-              <span class="term-dot term-dot--amber"></span>
-              <span class="term-dot term-dot--green"></span>
-            </div>
-            <span class="term-win-title">dailyjobpost — bash</span>
-          </div>
-          <div class="term-win-body">
-            <div class="term-row term-row--cmd">
-              <span class="term-ps1">user@dailyjobpost:~$</span>
-              <span class="term-cmd-text"> query --all --sort=latest</span>
-            </div>
-            <div class="term-row term-row--info">fetching opportunities...</div>
-            <div class="term-spacer"></div>
+      <h1 class="hero-headline">Find your next job, <span class="hero-headline-accent">worldwide</span>.</h1>
+      <p class="hero-subhead">{grandTotal.toLocaleString()} open roles across every industry &amp; country — updated daily.</p>
 
-            {jobs.slice(0, 5).map((job, i) => (
-              <div class={`term-row term-job term-job--${i}`}>
-                <span class="term-job-idx">[{String(i + 1).padStart(2, '0')}]</span>
-                <span class="term-job-detail">
-                  <span class="term-job-title">{job.title}</span>
-                  <span class="term-job-meta">
-                    {job.company}
-                    {(job.remote || job.type === 'remote') ? ' · REMOTE' : ` · ${job.location}`}
-                    {job.salary ? ` · ${job.salary}` : ''}
-                  </span>
-                </span>
-              </div>
-            ))}
-
-            <div class="term-spacer"></div>
-            <div class="term-row term-row--info term-result">
-              {jobs.length} results found · all systems [OK]
-            </div>
-            <div class="term-row term-row--cmd">
-              <span class="term-ps1">user@dailyjobpost:~$</span>
-              <span class="term-blink">▋</span>
-            </div>
-          </div>
-        </div>
+      <div class="hero-counts">
+        <div class="hero-count-item"><span class="hero-count-n">{grandTotal.toLocaleString()}</span><span class="hero-count-l">OPEN JOBS</span></div>
+        <span class="hero-count-div">·</span>
+        <div class="hero-count-item"><span class="hero-count-n">{remoteCount.toLocaleString()}</span><span class="hero-count-l">REMOTE</span></div>
+        <span class="hero-count-div">·</span>
+        <div class="hero-count-item"><span class="hero-count-n">{newThisWeek.toLocaleString()}</span><span class="hero-count-l">NEW THIS WEEK</span></div>
       </div>
 
+      <form class="hero-search" method="get" action="/">
+        <span class="hero-search-prefix">$</span>
+        <input class="hero-search-input" type="text" name="q" value={filters.q ?? ''} placeholder="job title, skill, company or country..." spellcheck="false" />
+        <button type="submit" class="hero-search-btn">SEARCH →</button>
+      </form>
+
+      <div class="hero-chips">
+        <span class="hero-chips-label">popular:</span>
+        <a href="/?country=Remote" class="hero-chip">remote</a>
+        <a href="/?category=Marketing" class="hero-chip">marketing</a>
+        <a href="/?category=Software / IT" class="hero-chip">software</a>
+        <a href="/?category=Finance" class="hero-chip">finance</a>
+        <a href="/?category=Design" class="hero-chip">design</a>
+        <a href="/?type=internship" class="hero-chip">internships</a>
+      </div>
     </div>
   </section>
 
-  <!-- ── Job listings ───────────────────────────────────── -->
-  <div id="jobs" class="jobs-section">
-    <JobList jobs={jobs} client:load />
+  <!-- ── Browse by category ────────────────────────────── -->
+  {!hasFilter && categoryStats.length > 0 && (
+    <section class="cat-section">
+      <div class="cat-inner">
+        <div class="section-head">
+          <span class="section-head-bar">▶</span>
+          <span class="section-head-title">BROWSE BY CATEGORY</span>
+          <span class="section-head-sub">// {grandTotal.toLocaleString()} jobs across {categoryStats.length} industries</span>
+        </div>
+        <div class="cat-grid">
+          {categoryStats.map(c => (
+            <a href={`/?category=${encodeURIComponent(c.name)}`} class="cat-card">
+              <span class="cat-card-marker">&gt;</span>
+              <span class="cat-card-name">{c.name}</span>
+              <span class="cat-card-count">{c.count} {c.count === 1 ? 'job' : 'jobs'}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ── Countries strip ───────────────────────────────── -->
+  {!hasFilter && countryStats.length > 0 && (
+    <section class="countries-strip">
+      <div class="countries-inner">
+        <div class="countries-label">$ browse --by-country</div>
+        <div class="countries-scroll">
+          {countryStats.map(c => (
+            <a href={c.name === 'Remote' ? '/?country=Remote' : `/?country=${encodeURIComponent(c.name)}`} class="country-chip">
+              <span class="country-flag">{c.flag}</span>
+              <span class="country-name">{c.name}</span>
+              <span class="country-count">{c.count}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ── Ad banner ─────────────────────────────────────── -->
+  {AD_SLOTS.banner && (
+    <div class="ad-slot-outer">
+      <div class="ad-slot-inner">
+        <div class="ad-label">ADVERTISEMENT</div>
+        <ins class="adsbygoogle ad-banner" style="display:block" data-ad-client={AD_CLIENT} data-ad-slot={AD_SLOTS.banner} data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+        <script is:inline>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      </div>
+    </div>
+  )}
+
+  <!-- ── Listings ──────────────────────────────────────── -->
+  <div class="jobs-section">
+    <div class="section-head section-head--inline">
+      <span class="section-head-bar">▶</span>
+      <span class="section-head-title">{hasFilter ? 'SEARCH RESULTS' : 'LATEST JOBS'}</span>
+      <span class="section-head-sub">// {hasFilter ? 'filtered' : 'sorted by most recent'}</span>
+    </div>
+
+    <form class="filter-bar" method="get" action="/">
+      <div class="filter-field filter-field--q">
+        <span class="filter-prefix">$</span>
+        <input class="filter-q" type="text" name="q" value={filters.q ?? ''} placeholder="search title, company, skill..." spellcheck="false" />
+      </div>
+      <select class="filter-sel" name="type" aria-label="Job type">
+        <option value="">type: all</option>
+        {[['full-time','Full-time'],['part-time','Part-time'],['contract','Contract'],['internship','Internship'],['remote','Remote']].map(([v,l]) => (
+          <option value={v} selected={filters.type === v}>{l}</option>
+        ))}
+      </select>
+      <select class="filter-sel" name="category" aria-label="Category">
+        <option value="">category: all</option>
+        {CATEGORIES.map(c => <option value={c.name} selected={filters.category === c.name}>{c.name}</option>)}
+      </select>
+      <select class="filter-sel" name="country" aria-label="Country">
+        <option value="">country: all</option>
+        {COUNTRY_META.map(c => <option value={c.name} selected={filters.country === c.name}>{c.name}</option>)}
+      </select>
+      <select class="filter-sel" name="posted" aria-label="Date posted">
+        <option value="">posted: any</option>
+        {[['1','past 24 hours'],['3','past 3 days'],['7','past week'],['14','past 2 weeks'],['30','past month']].map(([v,l]) => (
+          <option value={v} selected={filters.posted === v}>{l}</option>
+        ))}
+      </select>
+      <button type="submit" class="filter-go">FILTER →</button>
+    </form>
+
+    {hasFilter && (
+      <div class="active-filter-bar">
+        <span class="active-filter-tag">{activeLabel}</span>
+        <a class="active-filter-clear" href="/">✕ clear filters</a>
+      </div>
+    )}
+
+    <JobResults jobs={jobs} total={total} page={page} pages={pages} query={filters.q} makeHref={(n) => pageHref(filters, n)} />
   </div>
 
-  <!-- ── Email alert section ───────────────────────────── -->
+  <!-- ── Subscribe ─────────────────────────────────────── -->
   <section class="alert-section">
     <div class="alert-inner">
-      <div class="pane">
-        <div class="pane-header">▶ JOB_ALERTS // NEVER_MISS_A_ROLE</div>
-        <div class="alert-body">
-          <div class="alert-copy">
-            <div class="alert-title">get notified of new jobs</div>
-            <div class="alert-sub">Weekly digest of the latest engineering roles. No spam. Unsubscribe anytime.</div>
-          </div>
-          <form class="alert-form" onsubmit="return false" aria-label="Subscribe to job alerts">
-            <span class="alert-prompt">$</span>
-            <input type="email" class="alert-input" placeholder="your@email.com" autocomplete="email" aria-label="Email address" />
-            <button type="submit" class="btn btn-primary">[ SUBSCRIBE ]</button>
-          </form>
+      <div class="alert-body">
+        <div class="alert-copy">
+          <div class="alert-title">Get new jobs in your inbox</div>
+          <div class="alert-sub">A daily digest of the freshest roles. No spam. Unsubscribe anytime.</div>
         </div>
+        <form class="alert-form" onsubmit="return false" aria-label="Subscribe to job alerts">
+          <span class="alert-prompt">$</span>
+          <input type="email" class="alert-input" placeholder="your@email.com" autocomplete="email" aria-label="Email address" />
+          <button type="submit" class="btn btn-primary" style="padding:12px 16px;border:none;flex-shrink:0">[ SUBSCRIBE ]</button>
+        </form>
       </div>
     </div>
   </section>
 
-  <!-- ── Footer ────────────────────────────────────────── -->
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-logo">
-        <span class="nav-logo-icon">$_</span>
-        <span class="nav-logo-text">DAILYJOBPOST.ONLINE</span>
-      </div>
-      <div class="footer-links">
-        <a href="/">Jobs</a>
-        <a href="/">About</a>
-        <a href="/">Privacy</a>
-      </div>
-      <div class="footer-status">
-        <span style="color: var(--green);">[OK]</span> ALL SYSTEMS OPERATIONAL
+  <!-- ── Footer ad ─────────────────────────────────────── -->
+  {AD_SLOTS.footer && (
+    <div class="ad-slot-outer">
+      <div class="ad-slot-inner">
+        <div class="ad-label">ADVERTISEMENT</div>
+        <ins class="adsbygoogle ad-banner" style="display:block" data-ad-client={AD_CLIENT} data-ad-slot={AD_SLOTS.footer} data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+        <script is:inline>(adsbygoogle = window.adsbygoogle || []).push({});</script>
       </div>
     </div>
-    <div class="footer-copy">
-      data is static · rebuilt on every github push · no trackers · no cookies · dailyjobpost.online v2.1
-    </div>
-  </footer>
+  )}
 
+  <Footer />
 </Base>

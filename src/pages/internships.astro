@@ -1,54 +1,44 @@
 ---
 export const prerender = false;
 import Base from '../layouts/Base.astro';
-import JobList from '../components/JobList';
-import type { Job } from '../components/JobList';
-import { rowToJob, type JobRow } from '../lib/db';
+import Footer from '../components/Footer.astro';
+import JobResults from '../components/JobResults.astro';
+import { queryJobs, filtersFromUrl } from '../lib/jobquery';
 
 const { env } = Astro.locals.runtime;
-const result = await env.DB.prepare('SELECT * FROM jobs ORDER BY posted DESC, created_at DESC').all<JobRow>();
-const jobs: Job[] = (result.results ?? []).map(rowToJob);
-const internCount = jobs.filter(j => j.type === 'internship').length;
+const filters = filtersFromUrl(Astro.url);
+filters.type = 'internship';
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+
+const makeHref = (n: number) => {
+  const p = new URLSearchParams();
+  if (filters.q) p.set('q', filters.q);
+  if (n > 1) p.set('page', String(n));
+  const s = p.toString();
+  return '/internships' + (s ? `?${s}` : '');
+};
 ---
 
 <Base
-  title="Engineering Internships — dailyjobpost.online"
-  description={`${internCount} engineering internship${internCount !== 1 ? 's' : ''}. Start your career. Find internship roles on dailyjobpost.online.`}
+  title="Internships — Start Your Career — dailyjobpost.online"
+  description={`${total} internships across every industry. Kickstart your career. Updated daily.`}
 >
-
-  <!-- Page header -->
   <div class="page-header">
     <div class="page-header-inner">
       <a href="/" class="back-link">← ALL_JOBS</a>
       <h1 class="page-header-title">▶ INTERNSHIPS</h1>
-      <p class="page-header-sub">{internCount} engineering internship{internCount !== 1 ? 's' : ''} · start your career</p>
+      <p class="page-header-sub">{total.toLocaleString()} internship{total !== 1 ? 's' : ''} · start your career, worldwide</p>
+      <form class="page-search" method="get" action="/internships">
+        <span class="page-search-prefix">$</span>
+        <input class="page-search-input" type="text" name="q" value={filters.q ?? ''} placeholder="search internships..." spellcheck="false" />
+        <button type="submit" class="page-search-btn">SEARCH →</button>
+      </form>
     </div>
   </div>
 
-  <!-- Job listing -->
   <div class="jobs-section">
-    <JobList jobs={jobs} client:load withSearch initialTypeFilter="internship" />
+    <JobResults jobs={jobs} total={total} page={page} pages={pages} query={filters.q} makeHref={makeHref} />
   </div>
 
-  <!-- Footer -->
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-logo">
-        <span class="nav-logo-icon">$_</span>
-        <span class="nav-logo-text">DAILYJOBPOST.ONLINE</span>
-      </div>
-      <div class="footer-links">
-        <a href="/">Jobs</a>
-        <a href="/">About</a>
-        <a href="/">Privacy</a>
-      </div>
-      <div class="footer-status">
-        <span style="color: var(--green);">[OK]</span> ALL SYSTEMS OPERATIONAL
-      </div>
-    </div>
-    <div class="footer-copy">
-      data is static · rebuilt on every github push · no trackers · no cookies · dailyjobpost.online v2.1
-    </div>
-  </footer>
-
+  <Footer />
 </Base>

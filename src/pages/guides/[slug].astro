@@ -1,0 +1,82 @@
+---
+export const prerender = false;
+import { marked } from 'marked';
+import Base from '../../layouts/Base.astro';
+import Footer from '../../components/Footer.astro';
+import ShareButtons from '../../components/ShareButtons.astro';
+import { getGuide, GUIDES } from '../../lib/guides';
+
+const { slug } = Astro.params;
+const guide = getGuide(slug ?? '');
+if (!guide) return Astro.redirect('/guides');
+
+const bodyHtml = await marked.parse(guide.body);
+const url = `https://dailyjobpost.online/guides/${guide.slug}`;
+
+const related = GUIDES.filter(g => g.slug !== guide.slug).slice(0, 3);
+
+const articleLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": guide.title,
+  "description": guide.description,
+  "datePublished": guide.date,
+  "dateModified": guide.date,
+  "author": { "@type": "Organization", "name": "dailyjobpost.online" },
+  "publisher": { "@type": "Organization", "name": "dailyjobpost.online", "logo": { "@type": "ImageObject", "url": "https://dailyjobpost.online/favicon.svg" } },
+  "mainEntityOfPage": url,
+});
+const breadcrumbLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Guides", "item": "https://dailyjobpost.online/guides" },
+    { "@type": "ListItem", "position": 2, "name": guide.title, "item": url },
+  ],
+});
+---
+
+<Base title={`${guide.title} | dailyjobpost.online`} description={guide.description} canonical={url} ogType="article">
+  <script slot="head" type="application/ld+json" is:inline set:html={articleLd} />
+  <script slot="head" type="application/ld+json" is:inline set:html={breadcrumbLd} />
+
+  <article class="job-detail guide-detail">
+    <div class="guide-head">
+      <a href="/guides" class="back-link">← All guides</a>
+      <h1 class="guide-title">{guide.title}</h1>
+      <div class="guide-meta">{guide.readMins} min read · Published {guide.date} · dailyjobpost.online</div>
+    </div>
+
+    <div class="job-detail-layout">
+      <div class="job-detail-main">
+        <div class="job-detail-body guide-content" set:html={bodyHtml} />
+
+        <div class="guide-jobs-cta">
+          <div class="guide-jobs-cta-text">Ready to put this into practice?</div>
+          <a href="/" class="btn btn-primary">Browse 4,000+ jobs →</a>
+        </div>
+
+        {related.length > 0 && (
+          <div class="guide-related">
+            <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">MORE GUIDES</span></div>
+            <div class="guides-grid">
+              {related.map(g => (
+                <a href={`/guides/${g.slug}`} class="guide-card">
+                  <div class="guide-card-meta">{g.readMins} min read</div>
+                  <div class="guide-card-title">{g.title}</div>
+                  <div class="guide-card-cta">READ_GUIDE →</div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <aside class="job-detail-sidebar">
+        <ShareButtons url={url} title={guide.title} label="▶ SHARE_THIS_GUIDE" />
+      </aside>
+    </div>
+  </article>
+
+  <Footer />
+</Base>

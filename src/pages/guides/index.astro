@@ -1,0 +1,47 @@
+---
+export const prerender = false;
+import Base from '../../layouts/Base.astro';
+import Footer from '../../components/Footer.astro';
+import { GUIDES } from '../../lib/guides';
+
+const guides = [...GUIDES].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+const listLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "itemListElement": guides.map((g, i) => ({
+    "@type": "ListItem", "position": i + 1, "url": `https://dailyjobpost.online/guides/${g.slug}`, "name": g.title,
+  })),
+});
+---
+
+<Base
+  title="Career Guides — Job Search, Resumes & Interviews | dailyjobpost.online"
+  description="Free, practical career guides: how to apply for jobs online, write a resume, find remote work, prepare for interviews, and negotiate your salary."
+  canonical="https://dailyjobpost.online/guides"
+>
+  <script slot="head" type="application/ld+json" is:inline set:html={listLd} />
+
+  <div class="page-header">
+    <div class="page-header-inner">
+      <a href="/" class="back-link">← All jobs</a>
+      <h1 class="page-header-title">▶ CAREER_GUIDES</h1>
+      <p class="page-header-sub">Practical, no-fluff advice for finding work and getting hired.</p>
+    </div>
+  </div>
+
+  <div class="guides-wrap">
+    <div class="guides-grid">
+      {guides.map(g => (
+        <a href={`/guides/${g.slug}`} class="guide-card">
+          <div class="guide-card-meta">{g.readMins} min read · {g.date}</div>
+          <div class="guide-card-title">{g.title}</div>
+          <div class="guide-card-desc">{g.description}</div>
+          <div class="guide-card-cta">READ_GUIDE →</div>
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <Footer />
+</Base>

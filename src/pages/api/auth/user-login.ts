@@ -5,7 +5,7 @@ export const prerender = false;
 export const GET: APIRoute = async ({ locals, redirect, cookies }) => {
   const { env } = locals.runtime;
   const uuid  = crypto.randomUUID();
-  const state = `${uuid}:admin`;
+  const state = `${uuid}:user`;
 
   cookies.set('oauth_state', uuid, {
     httpOnly: true,

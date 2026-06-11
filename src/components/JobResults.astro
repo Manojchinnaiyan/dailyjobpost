@@ -1,0 +1,129 @@
+---
+import type { Job } from '../lib/db';
+import { AD_CLIENT, AD_SLOTS } from '../lib/ads';
+
+interface Props {
+  jobs: Job[];
+  total: number;
+  page: number;
+  pages: number;
+  makeHref: (page: number) => string;
+  query?: string;
+}
+const { jobs, total, page, pages, makeHref, query } = Astro.props;
+
+function initials(company: string): string {
+  return company.split(/[\s\-_]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+}
+function daysAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (diff <= 0) return 'today';
+  if (diff === 1) return '1d ago';
+  if (diff < 7) return `${diff}d ago`;
+  if (diff < 30) return `${Math.floor(diff / 7)}w ago`;
+  return `${Math.floor(diff / 30)}mo ago`;
+}
+
+const AD_INTERVAL = 8;
+
+// windowed page numbers
+const win: number[] = [];
+const from = Math.max(1, page - 2);
+const to = Math.min(pages, page + 2);
+for (let i = from; i <= to; i++) win.push(i);
+---
+
+<div class="jl-result-count">
+  <span class="prompt">&gt;&gt;</span>
+  <span>
+    {total.toLocaleString()} job{total !== 1 ? 's' : ''}
+    {query && <span> matching <span class="jl-query-text">"{query}"</span></span>}
+    {pages > 1 && <span> · page {page} of {pages}</span>}
+  </span>
+</div>
+
+{jobs.length === 0 ? (
+  <div class="jl-empty">
+    <div style="margin-bottom:8px">no jobs matched your search</div>
+    <div style="color:var(--amber);margin-bottom:16px;font-size:11px">[HINT] try different keywords or clear filters</div>
+    <a class="btn" href="/">[ VIEW_ALL_JOBS ]</a>
+  </div>
+) : (
+  <div class="job-grid">
+    {jobs.map((job, i) => {
+      const isRemote = job.remote || job.type === 'remote';
+      return (
+        <>
+          {AD_SLOTS.infeed && i > 0 && i % AD_INTERVAL === 0 && (
+            <div class="in-feed-ad">
+              <div class="ad-label">ADVERTISEMENT</div>
+              <ins class="adsbygoogle" style="display:block" data-ad-format="fluid"
+                data-ad-layout-key="-6t+ed+2i-1n-4w"
+                data-ad-client={AD_CLIENT} data-ad-slot={AD_SLOTS.infeed}></ins>
+              <script is:inline>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+            </div>
+          )}
+          <a href={`/jobs/${job.slug}`} class="jcard"
+            data-iu-event="Job Clicked"
+            data-iu-job-id={String(job.id)}
+            data-iu-title={job.title}
+            data-iu-company={job.company}
+            data-iu-category={job.category ?? ''}
+            data-iu-position={String(i + 1)}
+            data-iu-query={query ?? ''}>
+            <div class="jcard-logo">{initials(job.company)}</div>
+            <div class="jcard-content">
+              <div class="jcard-title-row">
+                <span class="jcard-title">{job.title}</span>
+                <div class="jcard-badges">
+                  {isRemote    && <span class="badge badge--remote">REMOTE</span>}
+                  {job.category && <span class="badge badge--dim">{job.category}</span>}
+                </div>
+              </div>
+              <div class="jcard-meta">
+                <span class="jcard-company">{job.company}</span>
+                <span class="jcard-sep">·</span>
+                <span>{isRemote ? 'Remote' : job.location}</span>
+                {job.salary && <><span class="jcard-sep">·</span><span class="jcard-salary">{job.salary}</span></>}
+                {job.experience && <><span class="jcard-sep">·</span><span>{job.experience}</span></>}
+              </div>
+              {job.tags.length > 0 && (
+                <div class="jcard-tags-row">
+                  {job.tags.slice(0, 5).map(t => <span class="job-tag">{t}</span>)}
+                  {job.tags.length > 5 && <span class="job-tag">+{job.tags.length - 5}</span>}
+                </div>
+              )}
+            </div>
+            <div class="jcard-side">
+              <span class="jcard-age">{daysAgo(job.posted)}</span>
+              <span class="jcard-type">{job.type.replace('-', '‑')}</span>
+              <span class="jcard-arrow">→</span>
+            </div>
+          </a>
+        </>
+      );
+    })}
+  </div>
+)}
+
+{pages > 1 && (
+  <nav class="pager" aria-label="Pagination">
+    {page > 1
+      ? <a class="page-btn" href={makeHref(page - 1)}>← prev</a>
+      : <span class="page-btn page-btn--off">← prev</span>}
+
+    {from > 1 && <><a class="page-btn" href={makeHref(1)}>1</a>{from > 2 && <span class="page-ellip">…</span>}</>}
+
+    {win.map(n => (
+      n === page
+        ? <span class="page-btn page-btn--active">{n}</span>
+        : <a class="page-btn" href={makeHref(n)}>{n}</a>
+    ))}
+
+    {to < pages && <>{to < pages - 1 && <span class="page-ellip">…</span>}<a class="page-btn" href={makeHref(pages)}>{pages}</a></>}
+
+    {page < pages
+      ? <a class="page-btn" href={makeHref(page + 1)}>next →</a>
+      : <span class="page-btn page-btn--off">next →</span>}
+  </nav>
+)}
