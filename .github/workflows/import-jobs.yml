@@ -27,12 +27,28 @@ jobs:
         run: node scripts/import-jobs.mjs
 
       - name: Prune jobs older than 45 days
-        run: >
-          npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y
-          --command "DELETE FROM jobs WHERE posted < date('now','-45 days')"
+        run: |
+          # Cloudflare's API occasionally returns transient auth/5xx errors — retry.
+          d1() {
+            for attempt in 1 2 3 4; do
+              npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y "$@" && return 0
+              echo "Attempt $attempt failed, retrying in $((attempt * 15))s..."
+              sleep $((attempt * 15))
+            done
+            return 1
+          }
+          d1 --command "DELETE FROM jobs WHERE posted < date('now','-45 days')"
 
       - name: Insert new jobs into D1
         run: |
+          d1() {
+            for attempt in 1 2 3 4; do
+              npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y "$@" && return 0
+              echo "Attempt $attempt failed, retrying in $((attempt * 15))s..."
+              sleep $((attempt * 15))
+            done
+            return 1
+          }
           shopt -s nullglob
           files=(jobs-batch-*.sql)
           if [ ${#files[@]} -eq 0 ]; then
@@ -41,5 +57,5 @@ jobs:
           fi
           for f in "${files[@]}"; do
             echo "Importing $f"
-            npx wrangler@4 d1 execute dailyjobpost-jobs --remote -y --file="$f"
+            d1 --file="$f"
           done
