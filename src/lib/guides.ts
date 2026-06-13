@@ -954,6 +954,103 @@ Breaking into tech from scratch often takes several months to a year of consiste
 
 Pick a lane, build real things, show your work, and network your way to the first role. The door is more open than it looks.`,
   },
+  {
+    slug: 'how-to-use-ai-in-your-job-search',
+    title: 'How to Use AI in Your Job Search (Without Sounding Like a Robot)',
+    description: 'AI tools can cut hours off your job search — if you use them as an assistant, not a ghostwriter. Here is how to use them for resumes, applications, and interview prep the smart way.',
+    date: '2026-06-12',
+    readMins: 6,
+    body: `AI tools have quietly become the job seeker's most powerful assistant. Used well, they cut the busywork out of applying and free you to focus on the parts that actually win interviews. Used badly, they make you sound like every other generic applicant. Here is how to use AI as a sharp assistant — not a crutch.
+
+## Use it to tailor, not to invent
+
+The biggest time sink in any job search is tailoring each application. AI is excellent at this. Paste in a job description and your base resume, and ask it to highlight which of your experiences match the role and suggest how to reword your bullet points to mirror the job's language.
+
+The rule: **AI rewrites what is true about you — it never invents what isn't.** A polished lie falls apart in the interview. Keep every claim something you can defend in person.
+
+## Beat the resume filters
+
+Most companies use applicant tracking systems (ATS) that scan for keywords before a human ever sees your resume. Ask AI to compare your resume against a specific job description and list the important keywords you are missing. Then weave the genuine ones into your experience.
+
+This single step gets more resumes past the first filter than any fancy template.
+
+## Draft cover letters in minutes
+
+A blank page is the enemy. Give AI three inputs — the job description, your top two relevant achievements, and one specific reason you want this company — and ask for a short, plain-spoken cover letter. Then **edit it heavily** so it sounds like you. The draft saves you 30 minutes; the edit makes it yours.
+
+## Prepare for interviews
+
+This is where AI quietly shines:
+
+- Ask it to generate likely interview questions for your exact role and seniority.
+- Practice answers out loud, then paste your answer back and ask for feedback.
+- Have it explain unfamiliar terms or technologies in the job posting so nothing catches you off guard.
+
+You can run a realistic mock interview at midnight for free — something that used to require a friend or a paid coach.
+
+## Research companies fast
+
+Before an interview, ask AI to summarise what a company does, who its competitors are, and what questions you might intelligently ask the interviewer. Verify the facts, but it gives you a running start in minutes instead of an hour of reading.
+
+## The mistakes to avoid
+
+- **Submitting raw AI output.** Recruiters can spot generic, over-polished text instantly. Always edit it into your own voice.
+- **Inventing skills or experience.** It will be exposed in seconds during a real conversation.
+- **Outsourcing your judgement.** AI suggests; you decide. You know your story better than any model.
+- **Pasting confidential info.** Don't paste anything you wouldn't want stored — sensitive personal data or an employer's private details.
+
+## Put the time you save to good use
+
+The whole point of using AI is to spend less time on admin and more time on what actually moves the needle: applying to roles that fit, reaching out to people, and preparing properly. Once your applications are flowing faster, browse fresh roles on dailyjobpost.online and put those saved hours into the jobs worth chasing.
+
+Treat AI as a tireless assistant that drafts, checks, and coaches — while you stay firmly in control of the truth and the voice. That balance is what turns it into an unfair advantage.`,
+  },
+  {
+    slug: 'how-to-spot-and-avoid-job-scams',
+    title: 'How to Spot and Avoid Job Scams',
+    description: 'Job scams are more common and more convincing than ever. Learn the red flags, the most common scam types, and exactly how to protect yourself and your money.',
+    date: '2026-06-13',
+    readMins: 5,
+    body: `Job hunting makes you hopeful — and scammers know it. Fake job offers have become more polished, often copying real company names, logos, and even real recruiters' identities. The good news: almost every scam shares the same handful of tells. Learn them once and you'll spot them every time.
+
+## The universal red flags
+
+If a "job opportunity" shows any of these, treat it as a scam until proven otherwise:
+
+- **They ask for money.** No legitimate employer charges you to apply, train, or get equipment. Any request for payment, "registration fees," or buying your own gear up front is a scam.
+- **The offer comes with no interview.** Real jobs involve a conversation. A full offer landing in your inbox out of nowhere is a major warning sign.
+- **They want your bank or ID details too early.** Banking info and government IDs come after you've signed a real offer — never during the first message.
+- **The pay is wildly high for little work.** "Earn 5,000 a week from home, no experience needed" is bait, not a job.
+- **Pressure to act fast.** Scammers manufacture urgency so you skip the checks. Real employers give you time to think.
+
+## Common scam types to know
+
+**The overpayment scam.** They "accidentally" send you too much money (a fake cheque or transfer) and ask you to refund the difference. The original payment later bounces and you're out the cash.
+
+**The equipment scam.** You're hired, then asked to buy a laptop or software from "their preferred vendor" and get reimbursed. The reimbursement never comes.
+
+**The fake recruiter.** Someone posing as a recruiter from a real company messages you on LinkedIn or WhatsApp, runs a quick "interview" over text, and offers a job — then asks for personal or financial details.
+
+**The data-harvest "application."** A fake listing exists only to collect your personal information. If an application form asks for your ID number, bank details, or passwords before any human contact, walk away.
+
+## How to verify a job is real
+
+- **Go to the source.** Find the company's official website and check whether the role is actually listed there. Apply through the company's own careers page when you can — every listing on dailyjobpost.online links straight to the employer's official posting for this reason.
+- **Check the email domain.** Legitimate recruiters use company email addresses, not generic gmail or outlook accounts.
+- **Search the company plus the word "scam."** If others have been targeted, it often shows up.
+- **Be suspicious of chat-only hiring.** Real hiring rarely happens entirely over WhatsApp or Telegram with no calls or formal documents.
+
+## What to do if you've been targeted
+
+- **Stop all contact** and don't send money or documents.
+- **Report it** to the platform where you found the listing and to your local fraud or consumer-protection authority.
+- **If you shared financial details,** contact your bank immediately to secure your accounts.
+- **If you shared an ID or password,** change affected passwords and watch for identity theft.
+
+## Stay hopeful, stay sharp
+
+Most employers and listings are genuine — don't let scammers make you cynical. Just keep one rule in mind: **a real job pays you, never the other way around.** Verify before you trust, apply through official sources, and you'll keep your search safe while you focus on landing the right role.`,
+  },
 ];
 
 export function getGuide(slug: string): Guide | undefined {
