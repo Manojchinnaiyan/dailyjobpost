@@ -1,0 +1,49 @@
+name: Daily LinkedIn posts
+
+# Runs automatically right after the daily scrape finishes ("Daily job import"),
+# so every day's fresh jobs become 10 LinkedIn posts with no manual step.
+on:
+  workflow_run:
+    workflows: ["Daily job import"]
+    types: [completed]
+  workflow_dispatch:         # manual runs from the Actions tab
+    inputs:
+      mode:
+        description: 'How to post'
+        type: choice
+        default: schedule
+        options: [schedule, publish, draft, dry-run]
+      max:
+        description: 'Max posts'
+        default: '10'
+
+concurrency:
+  group: post-linkedin
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # On the automatic trigger, only run if the scrape actually succeeded.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    env:
+      WOOPSOCIAL_API_KEY: ${{ secrets.WOOPSOCIAL_API_KEY }}
+      LINKEDIN_TRACK: dda301f4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build & schedule today's 10 LinkedIn posts
+        run: |
+          MODE="${{ github.event.inputs.mode || 'schedule' }}"
+          MAX="${{ github.event.inputs.max || '10' }}"
+          case "$MODE" in
+            publish)  FLAGS="--publish" ;;
+            draft)    FLAGS="--draft" ;;
+            dry-run)  FLAGS="" ;;
+            *)        FLAGS="--schedule --start=01:30 --interval=60" ;;  # start 07:00 IST, 1/hour → 07:00–16:00 IST
+          esac
+          node scripts/post-to-linkedin.mjs $FLAGS --max="$MAX"
