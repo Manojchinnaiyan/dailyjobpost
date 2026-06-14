@@ -402,6 +402,22 @@ async function main() {
   // unlike `wrangler d1 execute --file`, which takes the site down).
   await writeFile('jobs-statements.json', JSON.stringify(stmts));
   log(`Wrote jobs-statements.json (${stmts.length} statements)`);
+
+  // URLs to push to IndexNow + Google Indexing API for fast crawling.
+  // Recently-posted jobs (the time-sensitive ones) + stable key landing pages.
+  const SITE = 'https://dailyjobpost.online';
+  const recent = (() => { const d = new Date(); d.setDate(d.getDate() - 3); return d.toISOString().split('T')[0]; })();
+  const jobUrls = rows
+    .filter(r => (r.posted || '') >= recent)
+    .map(r => `${SITE}/jobs/${r.slug}`);
+  const landingUrls = [
+    `${SITE}/`, `${SITE}/remote`, `${SITE}/internships`, `${SITE}/guides`,
+    'software-it', 'data-and-analytics', 'marketing', 'sales', 'finance', 'design', 'healthcare',
+    'product', 'operations', 'human-resources', 'customer-support', 'legal', 'engineering',
+  ].map(s => s.startsWith('http') ? s : `${SITE}/category/${s}`);
+  const indexUrls = [...new Set([...jobUrls, ...landingUrls])];
+  await writeFile('index-urls.json', JSON.stringify(indexUrls));
+  log(`Wrote index-urls.json (${indexUrls.length} URLs: ${jobUrls.length} jobs + ${landingUrls.length} landing)`);
 }
 
 main();

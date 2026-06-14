@@ -50,3 +50,15 @@ jobs:
             exit 0
           fi
           node scripts/apply-sql.mjs jobs-statements.json
+
+      # Fast indexing: notify search engines of new jobs + landing pages.
+      # IndexNow (Bing/Yandex) needs no auth; Google no-ops until GOOGLE_INDEXING_SA is set.
+      - name: Ping IndexNow (Bing/Yandex)
+        if: always()
+        run: node scripts/ping-indexnow.mjs index-urls.json
+
+      - name: Ping Google Indexing API
+        if: always()
+        env:
+          GOOGLE_INDEXING_SA: ${{ secrets.GOOGLE_INDEXING_SA }}
+        run: node scripts/ping-google-index.mjs index-urls.json
