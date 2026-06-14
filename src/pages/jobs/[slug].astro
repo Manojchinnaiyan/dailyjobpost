@@ -14,12 +14,15 @@ if (!row) return Astro.redirect('/');
 const job = rowToJob(row);
 
 /* Imported jobs store HTML; admin-created jobs store Markdown. Render accordingly. */
-/* Source ATS HTML uses <div>s to separate paragraphs. Simply stripping those
-   containers left bare text that collapsed into one unspaced wall (and a stray
-   </div> could break the page grid). Instead, rebuild clean <p>/<ul> blocks:
-   convert every block boundary to a paragraph break, keep only inline
-   formatting, then re-wrap. Restores spacing and prevents grid/mobile breakage. */
+/* Source ATS HTML is unreliable: <div>s separate paragraphs (stripping them left
+   an unspaced wall) and some tags are MALFORMED (e.g. data-editor="13"> with a
+   stray '>' inside), which a naive <[^>]*> strip leaks as literal </p></div> —
+   that closed our wrappers early and dumped the footer into the layout grid.
+   Fix: quote-aware tag handling, then ESCAPE any leftover </> so nothing can
+   break the DOM, then rebuild clean <p>/<ul> blocks from plain text. */
 function cleanBody(html: string): string {
+  // Quote-aware attribute body: matches '>' only outside quoted attribute values.
+  const ATTRS = '(?:[^>"\']|"[^"]*"|\'[^\']*\')*';
   let s = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -27,17 +30,21 @@ function cleanBody(html: string): string {
 
   // List items → markers; list wrappers and breaks → paragraph/line breaks
   s = s
-    .replace(/<li[^>]*>/gi, '\n@@LI@@')
-    .replace(/<\/li>/gi, '')
-    .replace(/<\/?(?:ul|ol)[^>]*>/gi, '\n\n')
+    .replace(new RegExp(`<li\\b${ATTRS}>`, 'gi'), '\n@@LI@@')
+    .replace(/<\/li\s*>/gi, '')
+    .replace(new RegExp(`</?(?:ul|ol)\\b${ATTRS}>`, 'gi'), '\n\n')
     .replace(/<br\s*\/?>/gi, '\n');
 
   // Every block container (open or close) becomes a paragraph boundary
   const BLOCK = '(?:p|div|section|article|header|footer|main|aside|figure|figcaption|table|thead|tbody|tfoot|tr|td|th|colgroup|col|nav|form|h[1-6]|blockquote)';
-  s = s.replace(new RegExp(`</?${BLOCK}[^>]*>`, 'gi'), '\n\n');
+  s = s.replace(new RegExp(`</?${BLOCK}\\b${ATTRS}>`, 'gi'), '\n\n');
 
-  // Drop every remaining tag except the inline formatting we keep
-  s = s.replace(/<(?!\/?(?:strong|b|em|i|a)\b)[^>]*>/gi, '');
+  // Drop ALL remaining tags (quote-aware so '>' inside attrs can't end one early)
+  s = s.replace(new RegExp(`</?[a-zA-Z][a-zA-Z0-9]*${ATTRS}>`, 'g'), '');
+
+  // Safety net: escape any leftover angle brackets (malformed/partial tags or
+  // literal < > in text) so the output can never break the page structure.
+  s = s.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
