@@ -4,6 +4,7 @@ import { marked } from 'marked';
 import Base from '../../layouts/Base.astro';
 import Footer from '../../components/Footer.astro';
 import { rowToJob, type JobRow } from '../../lib/db';
+import { COUNTRY_KEYS } from '../../lib/jobquery';
 
 const { slug } = Astro.params;
 const { env } = Astro.locals.runtime;
@@ -119,6 +120,49 @@ function parseSalary(raw: string): Record<string, unknown> | null {
   return { '@type': 'MonetaryAmount', currency: cur, value };
 }
 
+/* Google Jobs requires a VALID country in jobLocation/applicantLocationRequirements —
+   "Worldwide" is rejected. Resolve ISO-3166 alpha-2 codes from the free-text
+   location using the same keyword map the search uses. */
+const COUNTRY_ISO: Record<string, string> = {
+  USA: 'US', India: 'IN', UK: 'GB', Canada: 'CA', Australia: 'AU', Germany: 'DE',
+  Singapore: 'SG', UAE: 'AE', Netherlands: 'NL', France: 'FR', Japan: 'JP', Ireland: 'IE', Mexico: 'MX',
+};
+function resolveCountries(loc: string): string[] {
+  const l = (loc || '').toLowerCase();
+  const codes: string[] = [];
+  for (const [name, keys] of Object.entries(COUNTRY_KEYS)) {
+    if (COUNTRY_ISO[name] && keys.some((k) => l.includes(k.toLowerCase()))) codes.push(COUNTRY_ISO[name]);
+  }
+  return [...new Set(codes)];
+}
+function cleanLocality(loc: string): string | null {
+  const first = (loc || '').split(/[,(|/]/)[0].trim();
+  if (!first || /remote|worldwide|anywhere|hybrid|onsite/i.test(first)) return null;
+  return first;
+}
+
+/** schema.org location fields that satisfy Google Jobs (valid country, no junk). */
+function buildLocationFields(loc: string, remote: boolean): Record<string, unknown> {
+  const codes = resolveCountries(loc);
+  const locality = cleanLocality(loc);
+  const out: Record<string, unknown> = {};
+
+  if (codes.length) {
+    const address: Record<string, unknown> = { '@type': 'PostalAddress', addressCountry: codes[0] };
+    if (locality) address.addressLocality = locality;
+    out.jobLocation = { '@type': 'Place', address };
+  }
+  if (remote) {
+    out.jobLocationType = 'TELECOMMUTE';
+    if (codes.length) {
+      out.applicantLocationRequirements = codes.length === 1
+        ? { '@type': 'Country', name: codes[0] }
+        : codes.map((c) => ({ '@type': 'Country', name: c }));
+    }
+  }
+  return out;
+}
+
 const postedDate = job.posted;
 const validThrough = new Date(new Date(job.posted).getTime() + 45 * 86_400_000).toISOString().split('T')[0];
 
@@ -132,13 +176,15 @@ const jobLd: Record<string, unknown> = {
   "employmentType": employmentTypeMap[job.type] ?? 'OTHER',
   "identifier": { "@type": "PropertyValue", "name": job.company, "value": String(job.id) },
   "hiringOrganization": { "@type": "Organization", "name": job.company },
-  "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location, "addressCountry": "Worldwide" } },
   "url": shareUrl,
   "directApply": false,
 };
-if (isRemote) {
-  jobLd["jobLocationType"] = "TELECOMMUTE";
-  jobLd["applicantLocationRequirements"] = { "@type": "Country", "name": job.location.replace(/remote\s*[-–,]?\s*/i, '').trim() || "Anywhere" };
+// Valid country-coded location fields (replaces the invalid "Worldwide").
+Object.assign(jobLd, buildLocationFields(job.location, isRemote));
+// Google requires a jobLocation OR a TELECOMMUTE type — if we couldn't resolve a
+// country and it isn't remote, fall back to the raw locality with no fake country.
+if (!jobLd.jobLocation && !jobLd.jobLocationType) {
+  jobLd.jobLocation = { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location || job.company } };
 }
 const baseSalary = parseSalary(job.salary || '');
 if (baseSalary) jobLd["baseSalary"] = baseSalary;
