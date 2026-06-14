@@ -23,6 +23,15 @@ jobs:
         with:
           node-version: 22
 
+      # Idempotent: ensures performance indexes exist (CREATE INDEX IF NOT EXISTS).
+      - name: Ensure D1 indexes
+        run: |
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_category ON jobs(category);"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_remote ON jobs(remote);"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted);"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_category_posted ON jobs(category, posted);"
+
       - name: Fetch jobs from Greenhouse / Lever / Ashby
         run: node scripts/import-jobs.mjs
 
