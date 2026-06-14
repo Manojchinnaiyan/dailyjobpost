@@ -263,7 +263,7 @@ a { color: var(--text); text-decoration: none; }
 .job-detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; padding-top: 28px; align-items: start; }
 .job-detail-main { min-width: 0; }
 .job-detail-section-label { font-size: 11px; font-weight: 700; color: var(--text-2); letter-spacing: 2px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
-.job-detail-body { font-size: 13px; line-height: 1.8; color: var(--text-2); }
+.job-detail-body { font-size: 13px; line-height: 1.8; color: var(--text-2); overflow-wrap: break-word; word-break: break-word; }
 .job-detail-body h1, .job-detail-body h2, .job-detail-body h3, .job-detail-body h4 { color: var(--text); font-weight: 700; margin: 20px 0 8px; letter-spacing: 0.5px; }
 .job-detail-body h1 { font-size: 15px; } .job-detail-body h2 { font-size: 14px; } .job-detail-body h3, .job-detail-body h4 { font-size: 13px; }
 .job-detail-body p { margin-bottom: 12px; }

@@ -14,15 +14,48 @@ if (!row) return Astro.redirect('/');
 const job = rowToJob(row);
 
 /* Imported jobs store HTML; admin-created jobs store Markdown. Render accordingly. */
-/* Strip structural/container tags — a stray </div> in source HTML can break the
-   page grid (pushing the sidebar below). Keep only safe inline/paragraph tags. */
+/* Source ATS HTML uses <div>s to separate paragraphs. Simply stripping those
+   containers left bare text that collapsed into one unspaced wall (and a stray
+   </div> could break the page grid). Instead, rebuild clean <p>/<ul> blocks:
+   convert every block boundary to a paragraph break, keep only inline
+   formatting, then re-wrap. Restores spacing and prevents grid/mobile breakage. */
 function cleanBody(html: string): string {
-  return html
+  let s = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<\/?(?:div|section|article|header|footer|main|aside|figure|figcaption|table|thead|tbody|tfoot|tr|td|th|colgroup|col|nav|form|button|svg|path|iframe|span)[^>]*>/gi, '')
-    .replace(/(\s*<br\s*\/?>\s*){3,}/gi, '<br><br>')
-    .trim();
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  // List items → markers; list wrappers and breaks → paragraph/line breaks
+  s = s
+    .replace(/<li[^>]*>/gi, '\n@@LI@@')
+    .replace(/<\/li>/gi, '')
+    .replace(/<\/?(?:ul|ol)[^>]*>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n');
+
+  // Every block container (open or close) becomes a paragraph boundary
+  const BLOCK = '(?:p|div|section|article|header|footer|main|aside|figure|figcaption|table|thead|tbody|tfoot|tr|td|th|colgroup|col|nav|form|h[1-6]|blockquote)';
+  s = s.replace(new RegExp(`</?${BLOCK}[^>]*>`, 'gi'), '\n\n');
+
+  // Drop every remaining tag except the inline formatting we keep
+  s = s.replace(/<(?!\/?(?:strong|b|em|i|a)\b)[^>]*>/gi, '');
+
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  // Re-wrap loose text into <p>, and marker runs into <ul><li>
+  const out: string[] = [];
+  let items: string[] = [];
+  const flush = () => { if (items.length) { out.push(`<ul>${items.map((i) => `<li>${i}</li>`).join('')}</ul>`); items = []; } };
+  for (const block of s.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)) {
+    if (block.includes('@@LI@@')) {
+      for (const item of block.split('@@LI@@')) { const t = item.trim(); if (t) items.push(t.replace(/\n/g, ' ')); }
+    } else {
+      flush();
+      const inner = block.replace(/\n/g, '<br>').trim();
+      if (inner) out.push(`<p>${inner}</p>`);
+    }
+  }
+  flush();
+  return out.join('\n');
 }
 const looksHtml = /<(p|ul|ol|li|h[1-6]|div|br|strong|em|b|i)\b/i.test(job.body);
 const bodyHtml = job.body ? (looksHtml ? cleanBody(job.body) : await marked.parse(job.body)) : '';
