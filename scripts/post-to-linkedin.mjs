@@ -73,12 +73,26 @@ const THEMES = {
 };
 const themeFor = (cat) => THEMES[cat] || THEMES._default;
 
-/* ── 1. Scrape today's jobs ── */
-async function scrapeJobs() {
+/* ── 1. Scrape today's jobs ──
+ * The site's ?posted=N filters by the EMPLOYER's posting date, so some days
+ * "posted in last 24h" (posted=1) yields only a handful. Widen the window
+ * (1 → 3 → 7 days) until we have enough jobs to fill the target post count,
+ * preferring the freshest. */
+async function scrapeJobs(needed) {
+  let best = { jobs: [], window: 'posted=1' };
+  for (const window of ['posted=1', 'posted=3', 'posted=7']) {
+    const jobs = await scrapeWindow(window);
+    if (jobs.length > best.jobs.length) best = { jobs, window };
+    if (jobs.length >= needed) return { jobs, window };
+  }
+  return best;
+}
+
+async function scrapeWindow(window) {
   const seen = new Set();
   const jobs = [];
-  for (let page = 1; page <= 5; page++) {
-    const res = await fetch(`${SITE}/?posted=1&page=${page}`);
+  for (let page = 1; page <= 6; page++) {
+    const res = await fetch(`${SITE}/?${window}&page=${page}`);
     if (!res.ok) break;
     const html = await res.text();
     const anchors = [...html.matchAll(/<a[^>]*href="(\/jobs\/[^"]+)"[^>]*>(.*?)<\/a>/gs)];
@@ -183,10 +197,11 @@ async function createPost({ text, accountId, platform, scheduledFor }) {
 
 /* ── main ── */
 (async () => {
-  const jobs = await scrapeJobs();
-  console.log(`Scraped ${jobs.length} jobs posted in the last 24h.`);
+  const { jobs, window } = await scrapeJobs(MAX_POSTS * LINKS_PER_POST);
+  console.log(`Scraped ${jobs.length} jobs (window ${window}).`);
   const posts = buildPosts(jobs);
   console.log(`Built ${posts.length} posts (${LINKS_PER_POST} links each).\n`);
+  if (!posts.length) { console.log('No posts to send — exiting.'); return; }
 
   if (MODE === 'DRY_RUN') {
     posts.forEach((p, i) => {
@@ -209,7 +224,9 @@ async function createPost({ text, accountId, platform, scheduledFor }) {
     if (start) {
       const [h, m] = start.split(':').map(Number);
       base.setUTCHours(h, m, 0, 0);
-      if (base < new Date()) base.setUTCDate(base.getUTCDate() + 1);
+      // If the target start already passed (e.g. a GitHub-cron-delayed run),
+      // start ~5 min from now so posts still go out TODAY, not tomorrow.
+      if (base < new Date()) { base.setTime(Date.now() + 5 * 60 * 1000); }
     } else {
       base.setUTCMinutes(base.getUTCMinutes() + 5);
     }
