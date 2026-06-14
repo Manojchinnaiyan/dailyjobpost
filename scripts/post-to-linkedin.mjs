@@ -49,6 +49,17 @@ const opt  = (name, def) => {
 const LINKS_PER_POST = parseInt(opt('links', '3'), 10);
 const MAX_POSTS      = parseInt(opt('max', '10'), 10);
 const INTERVAL_MIN   = parseInt(opt('interval', '45'), 10);
+
+// Optional category filter: --category="Software / IT,Data & Analytics"
+// AI/ML/data-titled roles are always allowed when a filter is set.
+const CAT_FILTER = (opt('category', '') || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+const AI_RE = /\b(ai|ml|machine[ -]?learning|data|llm|gen[ -]?ai|deep learning|nlp)\b/i;
+function jobAllowed(j) {
+  if (!CAT_FILTER.length) return true;
+  const cat = j.category.toLowerCase();
+  if (CAT_FILTER.some((c) => cat.includes(c) || c.includes(cat))) return true;
+  return AI_RE.test(j.title);
+}
 const MODE = flag('publish') ? 'PUBLISH_NOW'
            : flag('schedule') ? 'SCHEDULE_FOR_LATER'
            : flag('draft') ? 'DRAFT'
@@ -112,7 +123,9 @@ async function scrapeWindow(window) {
       const remote   = between.includes('REMOTE') || /remote/i.test(location);
       const category = between.filter((t) => t !== 'REMOTE')[0] || 'Jobs';
       if (!title || !company) continue;
-      jobs.push({ href, title, company: titleCase(company), location, remote, category });
+      const job = { href, title, company: titleCase(company), location, remote, category };
+      if (!jobAllowed(job)) continue;
+      jobs.push(job);
       added++;
     }
     if (!added) break;
