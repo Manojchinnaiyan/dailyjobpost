@@ -11,7 +11,7 @@ export const GET: APIRoute = async ({ locals }) => {
     .prepare('SELECT slug, posted FROM jobs ORDER BY posted DESC')
     .all<JobSlugRow>();
   const jobs = result.results ?? [];
-  const { categories, countries, combos } = await getLandingIndex(env.DB);
+  const { categories, countries, combos, roles, cities } = await getLandingIndex(env.DB);
 
   const base = 'https://dailyjobpost.online';
 
@@ -30,6 +30,8 @@ export const GET: APIRoute = async ({ locals }) => {
     ...categories.map(c => ({ loc: `${base}/category/${c.slug}`, priority: '0.8', changefreq: 'daily' })),
     ...countries.map(c => ({ loc: `${base}/jobs-in/${c.slug}`, priority: '0.8', changefreq: 'daily' })),
     ...combos.map(c => ({ loc: `${base}/jobs-in/${c.countrySlug}/${c.categorySlug}`, priority: '0.7', changefreq: 'daily' })),
+    ...roles.map(r => ({ loc: `${base}/roles/${r.slug}`, priority: '0.8', changefreq: 'daily' })),
+    ...cities.map(c => ({ loc: `${base}/jobs-in/${c.countrySlug}/${c.slug}`, priority: '0.7', changefreq: 'daily' })),
   ];
 
   const urlBlocks = [

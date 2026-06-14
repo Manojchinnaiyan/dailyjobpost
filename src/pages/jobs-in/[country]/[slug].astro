@@ -1,0 +1,111 @@
+---
+export const prerender = false;
+import Base from '../../../layouts/Base.astro';
+import Footer from '../../../components/Footer.astro';
+import JobResults from '../../../components/JobResults.astro';
+import { queryJobs, filtersFromUrl } from '../../../lib/jobquery';
+import { countryName, categoryName, findCity, getLandingIndex } from '../../../lib/landing';
+
+const { country, slug } = Astro.params;
+const cname = countryName(country ?? '');
+if (!cname) return Astro.redirect('/');
+
+// The second segment is either a category ("software-it") or a city ("new-york").
+const catname = categoryName(slug ?? '');
+const city = findCity(country ?? '', slug ?? '');
+if (!catname && !city) return Astro.redirect(`/jobs-in/${country}`, 302);
+
+const { env } = Astro.locals.runtime;
+const filters = filtersFromUrl(Astro.url);
+filters.country = cname;
+let heading: string;
+if (catname) { filters.category = catname; heading = `${catname} Jobs in ${cname}`; }
+else { filters.locationKeys = city!.keys; filters.country = undefined; heading = `Jobs in ${city!.name}`; }
+
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+if (total === 0) return Astro.redirect(`/jobs-in/${country}`, 302);
+
+const index = await getLandingIndex(env.DB);
+const more = catname
+  ? index.combos.filter((c) => c.countryName === cname && c.categoryName !== catname).slice(0, 12)
+      .map((c) => ({ href: `/jobs-in/${country}/${c.categorySlug}`, label: `${c.categoryName} jobs in ${cname}`, n: c.count }))
+  : index.cities.filter((c) => c.countrySlug === country && c.slug !== slug).slice(0, 12)
+      .map((c) => ({ href: `/jobs-in/${country}/${c.slug}`, label: `Jobs in ${c.name}`, n: c.count }));
+
+const base = 'https://dailyjobpost.online';
+const url = `${base}/jobs-in/${country}/${slug}`;
+const makeHref = (n: number) => {
+  const p = new URLSearchParams();
+  if (filters.q) p.set('q', filters.q);
+  if (n > 1) p.set('page', String(n));
+  const s = p.toString();
+  return `/jobs-in/${country}/${slug}` + (s ? `?${s}` : '');
+};
+
+const title = `${heading} — ${total.toLocaleString()} Openings | dailyjobpost.online`;
+const description = catname
+  ? `Browse ${total.toLocaleString()} ${catname} jobs in ${cname}. Apply directly to ${catname.toLowerCase()} roles at top companies hiring in ${cname}, updated daily.`
+  : `Find ${total.toLocaleString()} jobs in ${city!.name}, ${cname} across every industry. Apply directly to roles at companies hiring in ${city!.name}, updated daily.`;
+
+const crumbItems = catname
+  ? [
+      { '@type': 'ListItem', position: 1, name: 'Jobs', item: base + '/' },
+      { '@type': 'ListItem', position: 2, name: `Jobs in ${cname}`, item: `${base}/jobs-in/${country}` },
+      { '@type': 'ListItem', position: 3, name: heading, item: url },
+    ]
+  : [
+      { '@type': 'ListItem', position: 1, name: 'Jobs', item: base + '/' },
+      { '@type': 'ListItem', position: 2, name: `Jobs in ${cname}`, item: `${base}/jobs-in/${country}` },
+      { '@type': 'ListItem', position: 3, name: heading, item: url },
+    ];
+const breadcrumbLd = JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbItems });
+const itemListLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'ItemList',
+  name: heading, numberOfItems: total,
+  itemListElement: jobs.slice(0, 25).map((j, i) => ({
+    '@type': 'ListItem', position: i + 1,
+    url: `${base}/jobs/${j.slug}`, name: `${j.title} at ${j.company}`,
+  })),
+});
+
+const moreTitle = catname ? `MORE JOBS IN ${cname.toUpperCase()}` : `MORE CITIES IN ${cname.toUpperCase()}`;
+const introTxt = catname
+  ? `Find ${total.toLocaleString()} ${catname} jobs in ${cname} from companies hiring now. Every listing links straight to the employer's official application. Updated daily.`
+  : `Discover ${total.toLocaleString()} jobs in ${city!.name} across software, marketing, finance, design, healthcare and more. Every role links directly to the employer's official posting. Updated daily.`;
+---
+
+<Base title={title} description={description} canonical={url}>
+  <script slot="head" type="application/ld+json" is:inline set:html={breadcrumbLd} />
+  <script slot="head" type="application/ld+json" is:inline set:html={itemListLd} />
+
+  <div class="page-header">
+    <div class="page-header-inner">
+      <a href={`/jobs-in/${country}`} class="back-link">← JOBS IN {cname.toUpperCase()}</a>
+      <h1 class="page-header-title">▶ {heading.toUpperCase()}</h1>
+      <p class="page-header-sub">{total.toLocaleString()} job{total !== 1 ? 's' : ''} · updated daily</p>
+      <p class="landing-intro">{introTxt}</p>
+      <form class="page-search" method="get" action={`/jobs-in/${country}/${slug}`}>
+        <span class="page-search-prefix">$</span>
+        <input class="page-search-input" type="text" name="q" value={filters.q ?? ''} placeholder="search jobs..." spellcheck="false" />
+        <button type="submit" class="page-search-btn">SEARCH →</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="jobs-section">
+    <JobResults jobs={jobs} total={total} page={page} pages={pages} query={filters.q} makeHref={makeHref} />
+
+    {more.length > 0 && (
+      <nav class="landing-links">
+        <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">{moreTitle}</span></div>
+        <div class="landing-links-grid">
+          {more.map((m) => (
+            <a href={m.href} class="landing-link">{m.label} <span class="landing-link-n">{m.n}</span></a>
+          ))}
+        </div>
+      </nav>
+    )}
+  </div>
+
+  <Footer />
+</Base>

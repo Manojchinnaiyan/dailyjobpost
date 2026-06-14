@@ -1,0 +1,79 @@
+---
+export const prerender = false;
+import Base from '../../layouts/Base.astro';
+import Footer from '../../components/Footer.astro';
+import JobResults from '../../components/JobResults.astro';
+import { queryJobs, filtersFromUrl } from '../../lib/jobquery';
+import { ROLE_BY_SLUG, getLandingIndex } from '../../lib/landing';
+
+const { slug } = Astro.params;
+const role = ROLE_BY_SLUG[slug ?? ''];
+if (!role) return Astro.redirect('/');
+
+const { env } = Astro.locals.runtime;
+const filters = filtersFromUrl(Astro.url);
+filters.q = filters.q || role.q;
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+
+const index = await getLandingIndex(env.DB);
+const otherRoles = index.roles.filter((r) => r.slug !== slug).slice(0, 14);
+
+const base = 'https://dailyjobpost.online';
+const url = `${base}/roles/${slug}`;
+const makeHref = (n: number) => `/roles/${slug}` + (n > 1 ? `?page=${n}` : '');
+
+const title = `${role.label} Jobs — ${total.toLocaleString()} Open Roles | dailyjobpost.online`;
+const description = `Browse ${total.toLocaleString()} ${role.label} jobs worldwide, updated daily. Apply directly to ${role.label.toLowerCase()} roles at top companies on dailyjobpost.online.`;
+
+const breadcrumbLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Jobs', item: base + '/' },
+    { '@type': 'ListItem', position: 2, name: `${role.label} Jobs`, item: url },
+  ],
+});
+const itemListLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'ItemList',
+  name: `${role.label} Jobs`, numberOfItems: total,
+  itemListElement: jobs.slice(0, 25).map((j, i) => ({
+    '@type': 'ListItem', position: i + 1,
+    url: `${base}/jobs/${j.slug}`, name: `${j.title} at ${j.company}`,
+  })),
+});
+---
+
+<Base title={title} description={description} canonical={url}>
+  <script slot="head" type="application/ld+json" is:inline set:html={breadcrumbLd} />
+  <script slot="head" type="application/ld+json" is:inline set:html={itemListLd} />
+
+  <div class="page-header">
+    <div class="page-header-inner">
+      <a href="/" class="back-link">← ALL_JOBS</a>
+      <h1 class="page-header-title">▶ {role.label.toUpperCase()} JOBS</h1>
+      <p class="page-header-sub">{total.toLocaleString()} {role.label} job{total !== 1 ? 's' : ''} worldwide · updated daily</p>
+      <p class="landing-intro">Find {total.toLocaleString()} open {role.label} jobs from companies hiring right now. Every listing links straight to the employer's official application page. New {role.label.toLowerCase()} roles are added daily.</p>
+      <form class="page-search" method="get" action={`/roles/${slug}`}>
+        <span class="page-search-prefix">$</span>
+        <input class="page-search-input" type="text" name="q" value={filters.q ?? ''} placeholder={`search ${role.label.toLowerCase()} jobs...`} spellcheck="false" />
+        <button type="submit" class="page-search-btn">SEARCH →</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="jobs-section">
+    <JobResults jobs={jobs} total={total} page={page} pages={pages} query={filters.q} makeHref={makeHref} />
+
+    {otherRoles.length > 0 && (
+      <nav class="landing-links">
+        <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">BROWSE OTHER ROLES</span></div>
+        <div class="landing-links-grid">
+          {otherRoles.map((r) => (
+            <a href={`/roles/${r.slug}`} class="landing-link">{r.label} Jobs <span class="landing-link-n">{r.count}</span></a>
+          ))}
+        </div>
+      </nav>
+    )}
+  </div>
+
+  <Footer />
+</Base>

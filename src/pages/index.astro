@@ -5,7 +5,7 @@ import Footer from '../components/Footer.astro';
 import JobResults from '../components/JobResults.astro';
 import { queryJobs, filtersFromUrl, pageHref } from '../lib/jobquery';
 import { getHomeStats, CATEGORIES, COUNTRY_META } from '../lib/homestats';
-import { CATEGORY_SLUG, COUNTRY_SLUG } from '../lib/landing';
+import { CATEGORY_SLUG, COUNTRY_SLUG, getLandingIndex } from '../lib/landing';
 import { AD_CLIENT, AD_SLOTS } from '../lib/ads';
 
 const { env } = Astro.locals.runtime;
@@ -16,6 +16,9 @@ const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
 
 // Browse counts — cached in-memory (recomputed at most once per 10 min)
 const { grandTotal, remoteCount, newThisWeek, categoryStats, countryStats } = await getHomeStats(env.DB);
+
+// Popular roles for the "browse by role" SEO links (cached single-scan index).
+const topRoles = (await getLandingIndex(env.DB)).roles.slice(0, 18);
 
 const POSTED_LABELS: Record<string, string> = { '1': 'past 24 hours', '3': 'past 3 days', '7': 'past week', '14': 'past 2 weeks', '30': 'past month' };
 const hasFilter = !!(filters.q || filters.type || filters.category || filters.country || filters.posted);
@@ -138,6 +141,24 @@ const seoNoindex = !!filters.q;
               <span class="country-name">{c.name}</span>
               <span class="country-count">{c.count}</span>
             </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ── Browse by role ────────────────────────────────── -->
+  {!hasFilter && topRoles.length > 0 && (
+    <section class="cat-section">
+      <div class="cat-inner">
+        <div class="section-head">
+          <span class="section-head-bar">▶</span>
+          <span class="section-head-title">BROWSE BY ROLE</span>
+          <span class="section-head-sub">// popular job titles hiring now</span>
+        </div>
+        <div class="landing-links-grid">
+          {topRoles.map(r => (
+            <a href={`/roles/${r.slug}`} class="landing-link">{r.label} Jobs <span class="landing-link-n">{r.count}</span></a>
           ))}
         </div>
       </div>

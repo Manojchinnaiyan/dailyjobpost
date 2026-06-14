@@ -18,6 +18,7 @@ const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
 
 const index = await getLandingIndex(env.DB);
 const cats = index.combos.filter((c) => c.countryName === name).slice(0, 14);
+const cities = index.cities.filter((c) => c.countrySlug === slug).slice(0, 14);
 const otherCountries = index.countries.filter((c) => c.name !== name).slice(0, 12);
 
 const base = 'https://dailyjobpost.online';
@@ -77,6 +78,17 @@ const itemListLd = JSON.stringify({
         <div class="landing-links-grid">
           {cats.map((c) => (
             <a href={`/jobs-in/${slug}/${c.categorySlug}`} class="landing-link">{c.categoryName} jobs in {name} <span class="landing-link-n">{c.count}</span></a>
+          ))}
+        </div>
+      </nav>
+    )}
+
+    {cities.length > 0 && (
+      <nav class="landing-links">
+        <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">JOBS IN {name.toUpperCase()} BY CITY</span></div>
+        <div class="landing-links-grid">
+          {cities.map((c) => (
+            <a href={`/jobs-in/${slug}/${c.slug}`} class="landing-link">Jobs in {c.name} <span class="landing-link-n">{c.count}</span></a>
           ))}
         </div>
       </nav>

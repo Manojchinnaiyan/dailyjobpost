@@ -11,6 +11,7 @@ export interface JobFilters {
   category?: string;
   country?: string;    // key of COUNTRY_KEYS, or 'Remote'
   posted?: string;     // days window: '1' | '3' | '7' | '14' | '30'
+  locationKeys?: string[]; // city/location LIKE keywords (used by city landing pages)
   page?: number;
 }
 
@@ -95,6 +96,10 @@ export function buildWhere(f: JobFilters): WhereResult {
         keys.forEach(k => binds.push(`%${k.toLowerCase()}%`));
       }
     }
+  }
+  if (f.locationKeys?.length) {
+    where.push('(' + f.locationKeys.map(() => 'lower(location) LIKE ?').join(' OR ') + ')');
+    f.locationKeys.forEach(k => binds.push(`%${k.toLowerCase()}%`));
   }
 
   return { sql: where.length ? 'WHERE ' + where.join(' AND ') : '', binds, scoreSql, scoreBinds };
