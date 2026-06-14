@@ -27,9 +27,14 @@ const orgLd = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "dailyjobpost.online",
+  "alternateName": "DailyJobPost",
   "url": "https://dailyjobpost.online",
-  "logo": "https://dailyjobpost.online/favicon.svg",
-  "description": "A daily-updated global job board across every industry.",
+  "logo": "https://dailyjobpost.online/logo.png",
+  "description": "A daily-updated global job board across every industry, linking directly to employers' official applications.",
+  "sameAs": [
+    "https://www.linkedin.com/company/dailyjobpost",
+    "https://x.com/dailyjobpost",
+  ],
 });
 
 const { env } = Astro.locals.runtime;

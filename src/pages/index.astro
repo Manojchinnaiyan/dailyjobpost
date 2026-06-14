@@ -5,6 +5,7 @@ import Footer from '../components/Footer.astro';
 import JobResults from '../components/JobResults.astro';
 import { queryJobs, filtersFromUrl, pageHref } from '../lib/jobquery';
 import { getHomeStats, CATEGORIES, COUNTRY_META } from '../lib/homestats';
+import { CATEGORY_SLUG, COUNTRY_SLUG } from '../lib/landing';
 import { AD_CLIENT, AD_SLOTS } from '../lib/ads';
 
 const { env } = Astro.locals.runtime;
@@ -44,12 +45,21 @@ if (filters.category) {
   seoDesc  = `${total.toLocaleString()} jobs matching "${filters.q}". Updated daily on dailyjobpost.online.`;
 }
 
-/* Canonical: collapse free-text search + pagination; keep one facet. noindex raw searches. */
-const canonParams = new URLSearchParams();
-if (filters.category)      canonParams.set('category', filters.category);
-else if (filters.country)  canonParams.set('country', filters.country);
-else if (filters.type)     canonParams.set('type', filters.type);
-const seoCanonical = 'https://dailyjobpost.online/' + (canonParams.toString() ? `?${canonParams.toString()}` : '');
+/* Canonical: point facet views at their clean landing-page URL so all the
+   ?category= / ?country= variants consolidate into one indexable page.
+   noindex raw free-text searches. */
+let seoCanonical = 'https://dailyjobpost.online/';
+if (filters.category && CATEGORY_SLUG[filters.category]) {
+  seoCanonical = `https://dailyjobpost.online/category/${CATEGORY_SLUG[filters.category]}`;
+} else if (filters.country === 'Remote') {
+  seoCanonical = 'https://dailyjobpost.online/remote';
+} else if (filters.country && COUNTRY_SLUG[filters.country]) {
+  seoCanonical = `https://dailyjobpost.online/jobs-in/${COUNTRY_SLUG[filters.country]}`;
+} else if (filters.type === 'internship') {
+  seoCanonical = 'https://dailyjobpost.online/internships';
+} else if (filters.type === 'remote') {
+  seoCanonical = 'https://dailyjobpost.online/remote';
+}
 const seoNoindex = !!filters.q;
 ---
 
@@ -84,12 +94,12 @@ const seoNoindex = !!filters.q;
 
       <div class="hero-chips">
         <span class="hero-chips-label">popular:</span>
-        <a href="/?country=Remote" class="hero-chip">remote</a>
-        <a href="/?category=Marketing" class="hero-chip">marketing</a>
-        <a href="/?category=Software / IT" class="hero-chip">software</a>
-        <a href="/?category=Finance" class="hero-chip">finance</a>
-        <a href="/?category=Design" class="hero-chip">design</a>
-        <a href="/?type=internship" class="hero-chip">internships</a>
+        <a href="/remote" class="hero-chip">remote</a>
+        <a href="/category/marketing" class="hero-chip">marketing</a>
+        <a href="/category/software-it" class="hero-chip">software</a>
+        <a href="/category/finance" class="hero-chip">finance</a>
+        <a href="/category/design" class="hero-chip">design</a>
+        <a href="/internships" class="hero-chip">internships</a>
       </div>
     </div>
   </section>
@@ -105,7 +115,7 @@ const seoNoindex = !!filters.q;
         </div>
         <div class="cat-grid">
           {categoryStats.map(c => (
-            <a href={`/?category=${encodeURIComponent(c.name)}`} class="cat-card">
+            <a href={`/category/${CATEGORY_SLUG[c.name]}`} class="cat-card">
               <span class="cat-card-marker">&gt;</span>
               <span class="cat-card-name">{c.name}</span>
               <span class="cat-card-count">{c.count} {c.count === 1 ? 'job' : 'jobs'}</span>
@@ -123,7 +133,7 @@ const seoNoindex = !!filters.q;
         <div class="countries-label">$ browse --by-country</div>
         <div class="countries-scroll">
           {countryStats.map(c => (
-            <a href={c.name === 'Remote' ? '/?country=Remote' : `/?country=${encodeURIComponent(c.name)}`} class="country-chip">
+            <a href={c.name === 'Remote' ? '/remote' : `/jobs-in/${COUNTRY_SLUG[c.name]}`} class="country-chip">
               <span class="country-flag">{c.flag}</span>
               <span class="country-name">{c.name}</span>
               <span class="country-count">{c.count}</span>

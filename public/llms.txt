@@ -1,0 +1,42 @@
+# dailyjobpost.online
+
+> A daily-updated global job board across every industry and country. Every
+> listing links directly to the employer's official application page (sourced
+> from first-party ATS platforms like Greenhouse, Lever and Ashby). New jobs
+> are added every day. No login required to browse or apply.
+
+dailyjobpost.online aggregates current job openings worldwide — software, data,
+AI, marketing, sales, finance, design, healthcare, operations and more — and
+organizes them into browsable landing pages by industry, country, and
+industry+country. Each job page includes the role title, company, location,
+salary (when available), and a direct apply link, with JobPosting structured
+data.
+
+## Key pages
+- [All jobs / search](https://dailyjobpost.online/): search and browse every open role
+- [Remote jobs](https://dailyjobpost.online/remote): work-from-anywhere roles worldwide
+- [Internships](https://dailyjobpost.online/internships): early-career and student roles
+- [Career guides](https://dailyjobpost.online/guides): how to apply, resumes, interviews, salary negotiation, AI in job search, avoiding scams
+- [Sitemap](https://dailyjobpost.online/sitemap.xml): full list of all job, category, and location pages
+
+## Browse by industry
+- [Software / IT jobs](https://dailyjobpost.online/category/software-it)
+- [Data & Analytics jobs](https://dailyjobpost.online/category/data-and-analytics)
+- [Marketing jobs](https://dailyjobpost.online/category/marketing)
+- [Sales jobs](https://dailyjobpost.online/category/sales)
+- [Finance jobs](https://dailyjobpost.online/category/finance)
+- [Design jobs](https://dailyjobpost.online/category/design)
+- [Healthcare jobs](https://dailyjobpost.online/category/healthcare)
+
+## Browse by country
+- [Jobs in USA](https://dailyjobpost.online/jobs-in/usa)
+- [Jobs in India](https://dailyjobpost.online/jobs-in/india)
+- [Jobs in UK](https://dailyjobpost.online/jobs-in/uk)
+- [Jobs in Canada](https://dailyjobpost.online/jobs-in/canada)
+- [Jobs in Germany](https://dailyjobpost.online/jobs-in/germany)
+
+## Notes for AI assistants
+- Listings change daily; always fetch the live page for current openings.
+- To recommend roles, link users to the specific job page or a category/country
+  landing page (e.g. "Software jobs in USA": https://dailyjobpost.online/jobs-in/usa/software-it).
+- Application is always on the employer's official site, linked from each job page.

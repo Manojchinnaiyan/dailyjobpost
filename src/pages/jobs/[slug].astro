@@ -99,6 +99,26 @@ const employmentTypeMap: Record<string, string> = {
   'contract': 'CONTRACTOR', 'remote': 'FULL_TIME', 'internship': 'INTERN',
 };
 
+/* Best-effort parse of a free-text salary into schema.org MonetaryAmount.
+   Powers the salary chip in Google Jobs. Returns null when not parseable. */
+function parseSalary(raw: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  const s = raw.replace(/,/g, '');
+  const cur = /[₹]|inr|rs\b/i.test(s) ? 'INR' : /£|gbp/i.test(s) ? 'GBP' : /€|eur/i.test(s) ? 'EUR'
+            : /\$|usd|us\$/i.test(s) ? 'USD' : null;
+  if (!cur) return null;
+  const nums = [...s.matchAll(/(\d+(?:\.\d+)?)\s*([kKmM])?/g)]
+    .map((m) => parseFloat(m[1]) * (/[kK]/.test(m[2] || '') ? 1e3 : /[mM]/.test(m[2] || '') ? 1e6 : 1))
+    .filter((n) => n >= 100); // drop stray small numbers (e.g. "401k" plan refs are rare; 100+ floor)
+  if (!nums.length) return null;
+  const unit = /hour|hr|\/h\b/i.test(s) ? 'HOUR' : /month|\/mo\b/i.test(s) ? 'MONTH'
+             : /week|\/wk\b/i.test(s) ? 'WEEK' : /day|\/day\b/i.test(s) ? 'DAY' : 'YEAR';
+  const value = nums.length >= 2
+    ? { '@type': 'QuantitativeValue', minValue: Math.min(...nums), maxValue: Math.max(...nums), unitText: unit }
+    : { '@type': 'QuantitativeValue', value: nums[0], unitText: unit };
+  return { '@type': 'MonetaryAmount', currency: cur, value };
+}
+
 const postedDate = job.posted;
 const validThrough = new Date(new Date(job.posted).getTime() + 45 * 86_400_000).toISOString().split('T')[0];
 
@@ -120,6 +140,9 @@ if (isRemote) {
   jobLd["jobLocationType"] = "TELECOMMUTE";
   jobLd["applicantLocationRequirements"] = { "@type": "Country", "name": job.location.replace(/remote\s*[-–,]?\s*/i, '').trim() || "Anywhere" };
 }
+const baseSalary = parseSalary(job.salary || '');
+if (baseSalary) jobLd["baseSalary"] = baseSalary;
+if (job.category) jobLd["industry"] = job.category;
 
 const breadcrumbLd = JSON.stringify({
   "@context": "https://schema.org",

@@ -1,6 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { GUIDES } from '../lib/guides';
+import { getLandingIndex } from '../lib/landing';
 
 interface JobSlugRow { slug: string; posted: string; }
 
@@ -10,6 +11,7 @@ export const GET: APIRoute = async ({ locals }) => {
     .prepare('SELECT slug, posted FROM jobs ORDER BY posted DESC')
     .all<JobSlugRow>();
   const jobs = result.results ?? [];
+  const { categories, countries, combos } = await getLandingIndex(env.DB);
 
   const base = 'https://dailyjobpost.online';
 
@@ -19,11 +21,25 @@ export const GET: APIRoute = async ({ locals }) => {
     { loc: base + '/internships',  priority: '0.8', changefreq: 'daily' },
     { loc: base + '/guides',       priority: '0.6', changefreq: 'weekly' },
     { loc: base + '/about',        priority: '0.4', changefreq: 'monthly' },
+    { loc: base + '/contact',      priority: '0.3', changefreq: 'monthly' },
     { loc: base + '/privacy',      priority: '0.3', changefreq: 'yearly' },
+  ];
+
+  // Programmatic landing pages — these are what win long-tail search.
+  const landingUrls = [
+    ...categories.map(c => ({ loc: `${base}/category/${c.slug}`, priority: '0.8', changefreq: 'daily' })),
+    ...countries.map(c => ({ loc: `${base}/jobs-in/${c.slug}`, priority: '0.8', changefreq: 'daily' })),
+    ...combos.map(c => ({ loc: `${base}/jobs-in/${c.countrySlug}/${c.categorySlug}`, priority: '0.7', changefreq: 'daily' })),
   ];
 
   const urlBlocks = [
     ...staticUrls.map(u => `
+  <url>
+    <loc>${u.loc}</loc>
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`),
+    ...landingUrls.map(u => `
   <url>
     <loc>${u.loc}</loc>
     <changefreq>${u.changefreq}</changefreq>

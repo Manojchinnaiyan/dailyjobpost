@@ -1,0 +1,98 @@
+---
+export const prerender = false;
+import Base from '../../layouts/Base.astro';
+import Footer from '../../components/Footer.astro';
+import JobResults from '../../components/JobResults.astro';
+import { queryJobs, filtersFromUrl } from '../../lib/jobquery';
+import { countryName, getLandingIndex } from '../../lib/landing';
+
+const { slug } = Astro.params;
+const name = countryName(slug ?? '');
+if (!name) return Astro.redirect('/');
+
+const { env } = Astro.locals.runtime;
+const filters = filtersFromUrl(Astro.url);
+filters.country = name;
+filters.category = undefined;
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+
+const index = await getLandingIndex(env.DB);
+const cats = index.combos.filter((c) => c.countryName === name).slice(0, 14);
+const otherCountries = index.countries.filter((c) => c.name !== name).slice(0, 12);
+
+const base = 'https://dailyjobpost.online';
+const url = `${base}/jobs-in/${slug}`;
+const makeHref = (n: number) => {
+  const p = new URLSearchParams();
+  if (filters.q) p.set('q', filters.q);
+  if (n > 1) p.set('page', String(n));
+  const s = p.toString();
+  return `/jobs-in/${slug}` + (s ? `?${s}` : '');
+};
+
+const title = `Jobs in ${name} — ${total.toLocaleString()} Openings | dailyjobpost.online`;
+const description = `Find ${total.toLocaleString()} jobs in ${name} across every industry. Apply directly to roles at top companies hiring in ${name}, updated daily on dailyjobpost.online.`;
+
+const breadcrumbLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Jobs', item: base + '/' },
+    { '@type': 'ListItem', position: 2, name: `Jobs in ${name}`, item: url },
+  ],
+});
+const itemListLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'ItemList',
+  name: `Jobs in ${name}`, numberOfItems: total,
+  itemListElement: jobs.slice(0, 25).map((j, i) => ({
+    '@type': 'ListItem', position: i + 1,
+    url: `${base}/jobs/${j.slug}`, name: `${j.title} at ${j.company}`,
+  })),
+});
+---
+
+<Base title={title} description={description} canonical={url}>
+  <script slot="head" type="application/ld+json" is:inline set:html={breadcrumbLd} />
+  <script slot="head" type="application/ld+json" is:inline set:html={itemListLd} />
+
+  <div class="page-header">
+    <div class="page-header-inner">
+      <a href="/" class="back-link">← ALL_JOBS</a>
+      <h1 class="page-header-title">▶ JOBS IN {name.toUpperCase()}</h1>
+      <p class="page-header-sub">{total.toLocaleString()} job{total !== 1 ? 's' : ''} hiring in {name} · updated daily</p>
+      <p class="landing-intro">Discover {total.toLocaleString()} jobs in {name} across software, marketing, finance, design, healthcare and more. Every role links directly to the employer's official posting. Updated daily — search below or browse by industry.</p>
+      <form class="page-search" method="get" action={`/jobs-in/${slug}`}>
+        <span class="page-search-prefix">$</span>
+        <input class="page-search-input" type="text" name="q" value={filters.q ?? ''} placeholder={`search jobs in ${name}...`} spellcheck="false" />
+        <button type="submit" class="page-search-btn">SEARCH →</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="jobs-section">
+    <JobResults jobs={jobs} total={total} page={page} pages={pages} query={filters.q} makeHref={makeHref} />
+
+    {cats.length > 0 && (
+      <nav class="landing-links">
+        <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">JOBS IN {name.toUpperCase()} BY INDUSTRY</span></div>
+        <div class="landing-links-grid">
+          {cats.map((c) => (
+            <a href={`/jobs-in/${slug}/${c.categorySlug}`} class="landing-link">{c.categoryName} jobs in {name} <span class="landing-link-n">{c.count}</span></a>
+          ))}
+        </div>
+      </nav>
+    )}
+
+    {otherCountries.length > 0 && (
+      <nav class="landing-links">
+        <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">JOBS IN OTHER COUNTRIES</span></div>
+        <div class="landing-links-grid">
+          {otherCountries.map((c) => (
+            <a href={`/jobs-in/${c.slug}`} class="landing-link">{c.flag} Jobs in {c.name} <span class="landing-link-n">{c.count}</span></a>
+          ))}
+        </div>
+      </nav>
+    )}
+  </div>
+
+  <Footer />
+</Base>

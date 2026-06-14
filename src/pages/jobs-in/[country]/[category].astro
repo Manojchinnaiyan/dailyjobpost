@@ -1,0 +1,91 @@
+---
+export const prerender = false;
+import Base from '../../../layouts/Base.astro';
+import Footer from '../../../components/Footer.astro';
+import JobResults from '../../../components/JobResults.astro';
+import { queryJobs, filtersFromUrl } from '../../../lib/jobquery';
+import { countryName, categoryName, getLandingIndex } from '../../../lib/landing';
+
+const { country, category } = Astro.params;
+const cname = countryName(country ?? '');
+const catname = categoryName(category ?? '');
+if (!cname || !catname) return Astro.redirect('/');
+
+const { env } = Astro.locals.runtime;
+const filters = filtersFromUrl(Astro.url);
+filters.country = cname;
+filters.category = catname;
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+
+// Empty combo → send to the country page rather than indexing a blank page.
+if (total === 0) return Astro.redirect(`/jobs-in/${country}`, 302);
+
+const index = await getLandingIndex(env.DB);
+const otherCatsHere = index.combos.filter((c) => c.countryName === cname && c.categoryName !== catname).slice(0, 12);
+
+const base = 'https://dailyjobpost.online';
+const url = `${base}/jobs-in/${country}/${category}`;
+const makeHref = (n: number) => {
+  const p = new URLSearchParams();
+  if (filters.q) p.set('q', filters.q);
+  if (n > 1) p.set('page', String(n));
+  const s = p.toString();
+  return `/jobs-in/${country}/${category}` + (s ? `?${s}` : '');
+};
+
+const title = `${catname} Jobs in ${cname} — ${total.toLocaleString()} Openings | dailyjobpost.online`;
+const description = `Browse ${total.toLocaleString()} ${catname} jobs in ${cname}. Apply directly to ${catname.toLowerCase()} roles at top companies hiring in ${cname}, updated daily.`;
+
+const breadcrumbLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Jobs', item: base + '/' },
+    { '@type': 'ListItem', position: 2, name: `Jobs in ${cname}`, item: `${base}/jobs-in/${country}` },
+    { '@type': 'ListItem', position: 3, name: `${catname} Jobs in ${cname}`, item: url },
+  ],
+});
+const itemListLd = JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'ItemList',
+  name: `${catname} Jobs in ${cname}`, numberOfItems: total,
+  itemListElement: jobs.slice(0, 25).map((j, i) => ({
+    '@type': 'ListItem', position: i + 1,
+    url: `${base}/jobs/${j.slug}`, name: `${j.title} at ${j.company}`,
+  })),
+});
+---
+
+<Base title={title} description={description} canonical={url}>
+  <script slot="head" type="application/ld+json" is:inline set:html={breadcrumbLd} />
+  <script slot="head" type="application/ld+json" is:inline set:html={itemListLd} />
+
+  <div class="page-header">
+    <div class="page-header-inner">
+      <a href={`/jobs-in/${country}`} class="back-link">← JOBS IN {cname.toUpperCase()}</a>
+      <h1 class="page-header-title">▶ {catname.toUpperCase()} JOBS IN {cname.toUpperCase()}</h1>
+      <p class="page-header-sub">{total.toLocaleString()} {catname} job{total !== 1 ? 's' : ''} in {cname} · updated daily</p>
+      <p class="landing-intro">Find {total.toLocaleString()} {catname} jobs in {cname} from companies hiring now. Every listing links straight to the employer's official application. Updated daily on dailyjobpost.online.</p>
+      <form class="page-search" method="get" action={`/jobs-in/${country}/${category}`}>
+        <span class="page-search-prefix">$</span>
+        <input class="page-search-input" type="text" name="q" value={filters.q ?? ''} placeholder={`search ${catname.toLowerCase()} jobs in ${cname}...`} spellcheck="false" />
+        <button type="submit" class="page-search-btn">SEARCH →</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="jobs-section">
+    <JobResults jobs={jobs} total={total} page={page} pages={pages} query={filters.q} makeHref={makeHref} />
+
+    {otherCatsHere.length > 0 && (
+      <nav class="landing-links">
+        <div class="section-head"><span class="section-head-bar">▶</span><span class="section-head-title">MORE JOBS IN {cname.toUpperCase()}</span></div>
+        <div class="landing-links-grid">
+          {otherCatsHere.map((c) => (
+            <a href={`/jobs-in/${country}/${c.categorySlug}`} class="landing-link">{c.categoryName} jobs in {cname} <span class="landing-link-n">{c.count}</span></a>
+          ))}
+        </div>
+      </nav>
+    )}
+  </div>
+
+  <Footer />
+</Base>
