@@ -32,6 +32,12 @@ export const COUNTRY_KEYS: Record<string, string[]> = {
   Japan:      ['japan','tokyo','osaka'],
   Ireland:    ['ireland','dublin'],
   Mexico:     ['mexico','mexico city','guadalajara'],
+  Brazil:     ['brazil','brasil','são paulo','sao paulo','rio de janeiro','campinas','curitiba','belo horizonte','santa catarina','chapecó','chapeco'],
+  Poland:     ['poland','warsaw','warszawa','krakow','kraków','wrocław','wroclaw','gdańsk','gdansk'],
+  Spain:      ['spain','madrid','barcelona','españa','espana','valencia'],
+  Italy:      ['italy','italia','milan','milano','rome','roma'],
+  Portugal:   ['portugal','lisbon','lisboa','porto'],
+  Philippines:['philippines','manila','cebu','makati'],
 };
 
 const TYPE_VALUES = ['full-time','part-time','contract','internship'];

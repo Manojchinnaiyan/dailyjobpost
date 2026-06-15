@@ -126,6 +126,7 @@ function parseSalary(raw: string): Record<string, unknown> | null {
 const COUNTRY_ISO: Record<string, string> = {
   USA: 'US', India: 'IN', UK: 'GB', Canada: 'CA', Australia: 'AU', Germany: 'DE',
   Singapore: 'SG', UAE: 'AE', Netherlands: 'NL', France: 'FR', Japan: 'JP', Ireland: 'IE', Mexico: 'MX',
+  Brazil: 'BR', Poland: 'PL', Spain: 'ES', Italy: 'IT', Portugal: 'PT', Philippines: 'PH',
 };
 function resolveCountries(loc: string): string[] {
   const l = (loc || '').toLowerCase();
@@ -152,13 +153,14 @@ function buildLocationFields(loc: string, remote: boolean): Record<string, unkno
     if (locality) address.addressLocality = locality;
     out.jobLocation = { '@type': 'Place', address };
   }
-  if (remote) {
+  // Only mark TELECOMMUTE when we have a country — Google rejects a remote job
+  // that has jobLocationType but no applicantLocationRequirements. If the country
+  // is unknown, we leave both off and the caller adds a plain jobLocation instead.
+  if (remote && codes.length) {
     out.jobLocationType = 'TELECOMMUTE';
-    if (codes.length) {
-      out.applicantLocationRequirements = codes.length === 1
-        ? { '@type': 'Country', name: codes[0] }
-        : codes.map((c) => ({ '@type': 'Country', name: c }));
-    }
+    out.applicantLocationRequirements = codes.length === 1
+      ? { '@type': 'Country', name: codes[0] }
+      : codes.map((c) => ({ '@type': 'Country', name: c }));
   }
   return out;
 }
