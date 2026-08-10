@@ -10,7 +10,10 @@ const { slug } = Astro.params;
 const { env } = Astro.locals.runtime;
 
 const row = await env.DB.prepare('SELECT * FROM jobs WHERE slug = ?').bind(slug).first<JobRow>();
-if (!row) return Astro.redirect('/');
+/* Expired postings are deleted from D1, so a missing row means the job closed.
+   Answer 404 rather than redirecting to '/': Google treats a redirect from a
+   removed JobPosting as a soft 404 and leaves the dead URL indexed. */
+if (!row) return Astro.rewrite('/404');
 
 const job = rowToJob(row);
 
@@ -166,7 +169,15 @@ function buildLocationFields(loc: string, remote: boolean): Record<string, unkno
 }
 
 const postedDate = job.posted;
-const validThrough = new Date(new Date(job.posted).getTime() + 45 * 86_400_000).toISOString().split('T')[0];
+/* validThrough counts from the last date we confirmed the posting was still
+   open in its ATS, not from datePosted. A role can sit open for months, and
+   anchoring to datePosted published a validThrough already in the past for
+   every long-running listing — Google reads that as expired. Postings that go
+   away are deleted outright (scripts/expire-jobs.mjs), so a live row means we
+   saw it open on last_seen. */
+const confirmedOpen = row.last_seen || job.posted;
+const validThrough = new Date(new Date(confirmedOpen).getTime() + 30 * 86_400_000)
+  .toISOString().split('T')[0];
 
 const jobLd: Record<string, unknown> = {
   "@context": "https://schema.org",

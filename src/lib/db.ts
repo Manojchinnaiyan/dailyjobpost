@@ -15,6 +15,11 @@ export interface JobRow {
   category: string;
   body: string;
   created_at: string;
+  /* Date the posting was last confirmed open in its source ATS feed.
+     '' for rows created before expiry tracking, or by hand in /admin. */
+  last_seen: string;
+  /* Date its apply URL was last fetched for a verdict. See scripts/expire-jobs.mjs. */
+  last_checked: string;
 }
 
 export interface Job {

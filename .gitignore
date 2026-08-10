@@ -16,4 +16,7 @@ jobs-import.sql
 import.log
 jobs-batch-*.sql
 jobs-statements.json
+seen-statements.json
+prune-statements.json
+index-urls.json
 .claude/settings.json

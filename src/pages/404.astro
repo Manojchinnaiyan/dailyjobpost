@@ -1,0 +1,54 @@
+---
+export const prerender = false;
+import Base from '../layouts/Base.astro';
+
+/* Also reached via Astro.rewrite('/404') from /jobs/[slug] when a posting has
+   been expired and deleted. Google's JobPosting guidelines want a removed
+   posting to answer 404/410 — redirecting to the homepage instead reads as a
+   soft 404 and keeps the dead URL in the index. */
+Astro.response.status = 404;
+---
+
+<Base
+  title="404 — Not Found | dailyjobpost.online"
+  description="This page or job posting is no longer available."
+  noindex={true}
+>
+  <div class="nf-wrap">
+    <div class="nf-ps1">
+      <span class="ps1-prompt">user@dailyjobpost:~$</span>
+      <span class="ps1-cmd"> cat {Astro.url.pathname}</span>
+    </div>
+
+    <h1 class="nf-code">[ERR] 404 — NOT FOUND</h1>
+
+    <div class="nf-divider">// ═══════════════════════════════════════════ //</div>
+
+    <p class="nf-msg">
+      No such file or directory. If you followed a link to a job posting, that
+      role has closed and the listing was removed.
+    </p>
+
+    <div class="nf-actions">
+      <a class="nf-btn" href="/">[ ALL JOBS ]</a>
+      <a class="nf-btn" href="/remote">--remote</a>
+      <a class="nf-btn" href="/internships">--internships</a>
+    </div>
+
+    <div class="nf-divider">// ───────────────────────────────────────────</div>
+  </div>
+</Base>
+
+<style>
+  .nf-wrap     { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+  .nf-ps1      { font-size: 12px; margin-bottom: 18px; }
+  .ps1-prompt  { color: var(--amber); }
+  .ps1-cmd     { color: var(--dim); }
+  .nf-code     { font-size: 20px; font-weight: 700; color: var(--red); letter-spacing: 2px; margin: 0 0 10px; }
+  .nf-divider  { color: var(--muted); font-size: 12px; letter-spacing: 1px; margin: 10px 0; }
+  .nf-msg      { font-size: 13px; color: var(--green); line-height: 1.7; margin: 14px 0 22px; }
+  .nf-actions  { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .nf-btn      { background: transparent; border: 1px solid var(--muted); color: var(--muted);
+                 font-size: 11px; padding: 4px 12px; letter-spacing: 1px; text-decoration: none; }
+  .nf-btn:hover { background: var(--green); color: var(--bg); border-color: var(--green); text-shadow: none; }
+</style>

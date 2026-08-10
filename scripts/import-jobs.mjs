@@ -115,6 +115,24 @@ const PER_COMPANY = 55;          // cap jobs per company
 const TOTAL_CAP    = 8000;       // overall cap
 const BODY_CAP     = 7000;       // chars (HTML)
 
+// ── Delisting / expiry ──
+// A posting is "expired" when its own ATS stops listing it (filled, closed,
+// pulled) — not when it gets old. Every run stamps last_seen on every posting
+// still present in a feed; anything missing for this many consecutive runs is
+// deleted. Wide enough that a few days of transient board failures can't drop
+// live jobs, tight enough that dead links don't linger.
+const STALE_DAYS   = 7;
+// Far backstop for anything the delisting check can never reach (e.g. rows
+// whose source disappeared entirely). Deliberately NOT 45 days any more:
+// delisting now removes closed jobs within STALE_DAYS, and roles legitimately
+// stay open for months. The old 45-day rule deleted ~1,270 verified-open jobs
+// every night, which the next import simply re-inserted.
+const MAX_AGE_DAYS = 365;
+// Guard against a broken run (network outage, ATS-wide failure) looking like
+// "every job was delisted". Skip the stale prune unless the run was healthy.
+const MIN_BOARD_SUCCESS_RATE = 0.8;
+const MIN_LIVE_SLUGS         = 1000;
+
 // ── US location filter ──
 const NON_US = ['london','united kingdom',' uk','ireland','dublin','germany','berlin','munich','france','paris','india','bangalore','bengaluru','hyderabad','gurgaon','pune','chennai','noida','canada','toronto','vancouver','montreal','ottawa','singapore','australia','sydney','melbourne','japan','tokyo','netherlands','amsterdam','spain','madrid','barcelona','poland','warsaw','krakow','romania','bucharest','brazil','sao paulo','mexico','israel','tel aviv','china','shanghai','beijing','hong kong','emea','apac','latam','ontario','british columbia','portugal','lisbon','sweden','stockholm','denmark','copenhagen','italy','milan','switzerland','zurich','korea','seoul','philippines','manila','colombia','bogota','argentina','taiwan','vietnam','indonesia','jakarta','new zealand','auckland','dubai','uae','south africa','nigeria','kenya','egypt','turkey','istanbul'];
 
@@ -248,20 +266,25 @@ async function fetchJSON(url) {
 
 const seen = new Set();
 const rows = [];
+// Every slug the feeds still list — including postings we skip on location,
+// body length or the PER_COMPANY cap. This is the delisting signal, so it has
+// to reflect the whole feed, not just the subset we import.
+const liveSlugs = new Set();
 
 async function importGreenhouse(token) {
   const data = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs?content=true`);
   const company = company_name(token);
   let count = 0;
   for (const j of (data.jobs || [])) {
-    if (count >= PER_COMPANY) break;
-    const location = (j.location && j.location.name) || '';
-    if (!acceptLoc(location)) continue;
     const title = (j.title || '').trim();
     if (!title) continue;
+    const slug = toSlug(`${company}-${title}-${j.id}`);
+    liveSlugs.add(slug);
+    if (count >= PER_COMPANY || rows.length >= TOTAL_CAP) continue;
+    const location = (j.location && j.location.name) || '';
+    if (!acceptLoc(location)) continue;
     const body = sanitizeHtml(j.content || '');
     if (textLen(body) < 120) continue;
-    const slug = toSlug(`${company}-${title}-${j.id}`);
     if (seen.has(slug)) continue;
     seen.add(slug);
     rows.push({
@@ -284,14 +307,15 @@ async function importLever(token) {
   const company = company_name(token);
   let count = 0;
   for (const j of (Array.isArray(data) ? data : [])) {
-    if (count >= PER_COMPANY) break;
-    const location = (j.categories && j.categories.location) || '';
-    if (!acceptLoc(location)) continue;
     const title = (j.text || '').trim();
     if (!title) continue;
+    const slug = toSlug(`${company}-${title}-${j.id}`);
+    liveSlugs.add(slug);
+    if (count >= PER_COMPANY || rows.length >= TOTAL_CAP) continue;
+    const location = (j.categories && j.categories.location) || '';
+    if (!acceptLoc(location)) continue;
     const body = sanitizeHtml(j.description || j.descriptionPlain || '');
     if (textLen(body) < 120) continue;
-    const slug = toSlug(`${company}-${title}-${j.id}`);
     if (seen.has(slug)) continue;
     seen.add(slug);
     const commitment = (j.categories && j.categories.commitment) || '';
@@ -318,14 +342,15 @@ async function importAshby(org) {
   const company = company_name(org);
   let count = 0;
   for (const j of (data.jobs || [])) {
-    if (count >= PER_COMPANY) break;
-    const location = j.location || (j.isRemote ? 'Remote' : '') || (j.address?.postalAddress?.addressLocality) || '';
-    if (!acceptLoc(location)) continue;
     const title = (j.title || '').trim();
     if (!title) continue;
+    const slug = toSlug(`${company}-${title}-${j.id || j.jobId || title}`);
+    liveSlugs.add(slug);
+    if (count >= PER_COMPANY || rows.length >= TOTAL_CAP) continue;
+    const location = j.location || (j.isRemote ? 'Remote' : '') || (j.address?.postalAddress?.addressLocality) || '';
+    if (!acceptLoc(location)) continue;
     const body = sanitizeHtml(j.descriptionHtml || '');
     if (textLen(body) < 120) continue;
-    const slug = toSlug(`${company}-${title}-${j.id || j.jobId || title}`);
     if (seen.has(slug)) continue;
     seen.add(slug);
     let type = inferType(title, location);
@@ -360,28 +385,38 @@ async function main() {
     log(`Merged discovered companies: ${GREENHOUSE.length} greenhouse, ${LEVER.length} lever, ${ASHBY.length} ashby`);
   } catch { log('No companies.json — using built-in list only'); }
 
-  for (const token of GREENHOUSE) {
-    if (rows.length >= TOTAL_CAP) break;
-    try { const n = await importGreenhouse(token); log(`✓ greenhouse/${token}: ${n}`); }
-    catch (e) { log(`✗ greenhouse/${token}: ${e.message}`); }
-  }
-  for (const token of ASHBY) {
-    if (rows.length >= TOTAL_CAP) break;
-    try { const n = await importAshby(token); log(`✓ ashby/${token}: ${n}`); }
-    catch (e) { log(`✗ ashby/${token}: ${e.message}`); }
-  }
-  for (const token of LEVER) {
-    if (rows.length >= TOTAL_CAP) break;
-    try { const n = await importLever(token); log(`✓ lever/${token}: ${n}`); }
-    catch (e) { log(`✗ lever/${token}: ${e.message}`); }
-  }
+  // NOTE: every board is fetched even once TOTAL_CAP is reached — the caps
+  // limit what we INSERT, but skipping a board would leave its live postings
+  // out of liveSlugs and get them expired as if they had been delisted.
+  // A 404 board is a PERMANENT state (the token never existed, or the company
+  // left that ATS) and is normal here — the discovered-company list is full of
+  // guesses. Only transient failures (timeout, 429, 5xx) mean "we cannot see
+  // the truth right now", so only those get a say in whether pruning is safe.
+  let boardsOk = 0, boardsMissing = 0, boardsErrored = 0;
+  const runBoard = async (kind, token, fn) => {
+    try { const n = await fn(token); boardsOk++; log(`✓ ${kind}/${token}: ${n}`); }
+    catch (e) {
+      if (/HTTP 404/.test(e.message)) { boardsMissing++; log(`· ${kind}/${token}: no such board`); }
+      else { boardsErrored++; log(`✗ ${kind}/${token}: ${e.message}`); }
+    }
+  };
+  for (const token of GREENHOUSE) await runBoard('greenhouse', token, importGreenhouse);
+  for (const token of ASHBY)      await runBoard('ashby', token, importAshby);
+  for (const token of LEVER)      await runBoard('lever', token, importLever);
 
-  log(`\nTotal jobs collected: ${rows.length}`);
+  const reachable = boardsOk + boardsErrored;
+  const successRate = reachable ? boardsOk / reachable : 0;
+  log(`\nBoards: ${boardsOk} ok, ${boardsMissing} missing (404), ${boardsErrored} errored`);
+  log(`Transient health: ${(successRate * 100).toFixed(1)}% of reachable boards responded`);
+  log(`Live postings seen across all feeds: ${liveSlugs.size}`);
+  log(`Total jobs collected: ${rows.length}`);
+
+  const today = new Date().toISOString().slice(0, 10);
 
   const stmts = rows.slice(0, TOTAL_CAP).map(r =>
-    `INSERT OR IGNORE INTO jobs (slug,title,company,location,type,remote,urgent,salary,tags,posted,apply_url,experience,category,body) VALUES (` +
+    `INSERT OR IGNORE INTO jobs (slug,title,company,location,type,remote,urgent,salary,tags,posted,apply_url,experience,category,body,last_seen) VALUES (` +
     `${sq(r.slug)},${sq(r.title)},${sq(r.company)},${sq(r.location)},${sq(r.type)},${r.remote},0,'',` +
-    `${sq(JSON.stringify(r.tags))},${sq(r.posted)},${sq(r.apply_url)},'',${sq(r.category)},${sq(r.body)});`
+    `${sq(JSON.stringify(r.tags))},${sq(r.posted)},${sq(r.apply_url)},'',${sq(r.category)},${sq(r.body)},${sq(today)});`
   );
 
   // Write batched SQL files. ADDITIVE: uses INSERT OR IGNORE on the unique
@@ -402,6 +437,35 @@ async function main() {
   // unlike `wrangler d1 execute --file`, which takes the site down).
   await writeFile('jobs-statements.json', JSON.stringify(stmts));
   log(`Wrote jobs-statements.json (${stmts.length} statements)`);
+
+  // ── Delisting: stamp every posting the feeds still list ──────────────────
+  // A job that stops appearing here stops being stamped, which is what marks
+  // it as expired. Must be applied BEFORE any prune runs.
+  const live = [...liveSlugs];
+  const seenStmts = [];
+  for (let i = 0; i < live.length; i += 150) {
+    const list = live.slice(i, i + 150).map(sq).join(',');
+    seenStmts.push(`UPDATE jobs SET last_seen=${sq(today)} WHERE last_seen<>${sq(today)} AND slug IN (${list});`);
+  }
+  await writeFile('seen-statements.json', JSON.stringify(seenStmts));
+  log(`Wrote seen-statements.json (${seenStmts.length} statements for ${live.length} live slugs)`);
+
+  // ── Prune ────────────────────────────────────────────────────────────────
+  // Emitted only when the run looks healthy. A network outage that fails most
+  // boards would otherwise read as "every job was delisted" and empty the DB.
+  const healthy = successRate >= MIN_BOARD_SUCCESS_RATE && liveSlugs.size >= MIN_LIVE_SLUGS;
+  const pruneStmts = healthy
+    ? [
+        // Delisted: gone from its own ATS for STALE_DAYS consecutive runs.
+        // last_seen<>'' skips hand-made admin jobs, which are never stamped.
+        `DELETE FROM jobs WHERE last_seen<>'' AND last_seen < date('now','-${STALE_DAYS} days');`,
+        // Backstop: nothing outlives the validThrough window we publish.
+        `DELETE FROM jobs WHERE posted < date('now','-${MAX_AGE_DAYS} days');`,
+      ]
+    : [];
+  await writeFile('prune-statements.json', JSON.stringify(pruneStmts));
+  if (healthy) log(`Wrote prune-statements.json (${pruneStmts.length} statements)`);
+  else log(`SKIPPING PRUNE — unhealthy run (${(successRate * 100).toFixed(1)}% boards ok, ${liveSlugs.size} live slugs)`);
 
   // URLs to push to IndexNow + Google Indexing API for fast crawling.
   // Recently-posted jobs (the time-sensitive ones) + stable key landing pages.

@@ -1,0 +1,59 @@
+name: Expire dead jobs
+
+# Manual sweep: fetch the apply URL of every job the ATS feeds have stopped
+# listing, and delete the ones confirmed dead. The nightly import runs this
+# too (see import-jobs.yml); this workflow exists to run it on demand — start
+# with dry_run to see the numbers before anything is deleted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report only, delete nothing'
+        type: boolean
+        default: true
+      limit:
+        description: 'Max suspect jobs to probe this run'
+        default: '15000'
+      max_delete:
+        description: 'Abort if more than this many jobs come back dead'
+        default: '8000'
+
+concurrency:
+  group: d1-writes          # never overlap with the nightly import
+  cancel-in-progress: false
+
+jobs:
+  expire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Ensure expiry columns
+        run: |
+          node scripts/apply-sql.mjs --tolerate --command "ALTER TABLE jobs ADD COLUMN last_seen TEXT NOT NULL DEFAULT '';"
+          node scripts/apply-sql.mjs --tolerate --command "ALTER TABLE jobs ADD COLUMN last_checked TEXT NOT NULL DEFAULT '';"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen);"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_last_checked ON jobs(last_checked);"
+
+      # Seeds last_seen from posted for ATS rows so the existing backlog of
+      # dead postings becomes checkable. No-op once every row is tracked.
+      - name: Backfill last_seen for untracked ATS jobs
+        run: >
+          node scripts/apply-sql.mjs --command
+          "UPDATE jobs SET last_seen = posted WHERE last_seen = '' AND (apply_url LIKE '%gh_jid%' OR apply_url LIKE '%greenhouse.io%' OR apply_url LIKE '%lever.co%' OR apply_url LIKE '%ashbyhq.com%');"
+
+      - name: Probe suspects
+        run: >
+          node scripts/expire-jobs.mjs
+          ${{ inputs.dry_run && '--dry-run' || '' }}
+          --limit ${{ inputs.limit }}
+          --max-delete ${{ inputs.max_delete }}

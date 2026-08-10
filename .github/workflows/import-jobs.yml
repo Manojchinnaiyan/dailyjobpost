@@ -12,7 +12,9 @@ concurrency:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Fetching every board takes ~20 min and the expiry sweep adds ~15 more;
+    # 45 was cutting it close once boards are no longer skipped after TOTAL_CAP.
+    timeout-minutes: 90
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -32,16 +34,31 @@ jobs:
           node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted);"
           node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_category_posted ON jobs(category, posted);"
 
+      # Expiry tracking columns. SQLite has no ADD COLUMN IF NOT EXISTS, so
+      # these fail harmlessly once they exist — hence --tolerate.
+      - name: Ensure expiry columns
+        run: |
+          node scripts/apply-sql.mjs --tolerate --command "ALTER TABLE jobs ADD COLUMN last_seen TEXT NOT NULL DEFAULT '';"
+          node scripts/apply-sql.mjs --tolerate --command "ALTER TABLE jobs ADD COLUMN last_checked TEXT NOT NULL DEFAULT '';"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen);"
+          node scripts/apply-sql.mjs --command "CREATE INDEX IF NOT EXISTS idx_jobs_last_checked ON jobs(last_checked);"
+
       - name: Fetch jobs from Greenhouse / Lever / Ashby
         run: node scripts/import-jobs.mjs
 
       # All writes go through the D1 HTTP /query API (scripts/apply-sql.mjs).
       # Never use `wrangler d1 execute --file` here — its bulk import locks
       # the database and takes the live site down while it runs.
-      - name: Prune jobs older than 45 days
-        run: >
-          node scripts/apply-sql.mjs --command
-          "DELETE FROM jobs WHERE posted < date('now','-45 days');"
+      #
+      # ORDER MATTERS: stamp everything the feeds still list BEFORE pruning,
+      # otherwise live jobs get deleted for looking stale.
+      - name: Stamp jobs still live in their ATS feed
+        run: |
+          if [ ! -f seen-statements.json ]; then
+            echo "No live-slug statements produced — skipping."
+            exit 0
+          fi
+          node scripts/apply-sql.mjs seen-statements.json
 
       - name: Insert new jobs into D1
         run: |
@@ -50,6 +67,22 @@ jobs:
             exit 0
           fi
           node scripts/apply-sql.mjs jobs-statements.json
+
+      # Deletes postings delisted from their ATS, plus the 45-day age backstop.
+      # import-jobs.mjs writes an EMPTY statement list when the run was unhealthy
+      # (most boards failed), so a bad night prunes nothing instead of everything.
+      - name: Prune delisted and expired jobs
+        run: |
+          if [ ! -f prune-statements.json ]; then
+            echo "No prune statements produced — skipping."
+            exit 0
+          fi
+          node scripts/apply-sql.mjs prune-statements.json
+
+      # Second opinion: ask the ATS directly about anything the feeds dropped.
+      # Confirmed-dead postings go immediately; live ones get rescued.
+      - name: Verify suspect jobs by fetching their apply URL
+        run: node scripts/expire-jobs.mjs
 
       # Fast indexing: notify search engines of new jobs + landing pages.
       # IndexNow (Bing/Yandex) needs no auth; Google no-ops until GOOGLE_INDEXING_SA is set.
