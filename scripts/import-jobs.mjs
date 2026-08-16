@@ -5,8 +5,13 @@ import { readFile, writeFile } from 'node:fs/promises';
  * These are official, public hiring endpoints intended for consumption.
  * Each job links back to the company's own apply page.
  *
- * Usage: node scripts/import-jobs.mjs > jobs-import.sql
- * Then:  npx wrangler d1 execute dailyjobpost-jobs --remote --file=jobs-import.sql
+ * Usage: node scripts/import-jobs.mjs
+ * Then:  node scripts/apply-sql.mjs seen-statements.json   # stamp live jobs
+ *        node scripts/apply-sql.mjs jobs-statements.json   # insert new jobs
+ *        node scripts/apply-sql.mjs prune-statements.json  # drop delisted
+ *
+ * Never `wrangler d1 execute --file`: its bulk-import endpoint locks the
+ * database and takes the live site down while it runs.
  */
 
 // ── Companies that publish via Greenhouse public boards (global hirers) ──
@@ -539,22 +544,17 @@ async function main() {
     `${sq(JSON.stringify(r.tags))},${sq(r.posted)},${sq(r.apply_url)},'',${sq(r.category)},${sq(r.body)},${sq(today)});`
   );
 
-  // Write batched SQL files. ADDITIVE: uses INSERT OR IGNORE on the unique
-  // slug, so existing jobs are kept and only genuinely-new postings are added.
-  // (No DELETE — re-running accumulates instead of wiping. Prune old jobs
-  // separately, e.g. DELETE FROM jobs WHERE posted < date('now','-45 days').)
-  const BATCH = 200;
-  const files = [];
-  for (let i = 0; i < stmts.length; i += BATCH) {
-    const idx = i / BATCH;
-    const name = `jobs-batch-${String(idx).padStart(2, '0')}.sql`;
-    await writeFile(name, stmts.slice(i, i + BATCH).join('\n') + '\n');
-    files.push(name);
-  }
-  log(`Wrote ${files.length} batch file(s): ${files.join(' ')}`);
-
-  // Statements as JSON for scripts/apply-sql.mjs (D1 HTTP API — no DB lock,
-  // unlike `wrangler d1 execute --file`, which takes the site down).
+  // Statements for scripts/apply-sql.mjs, which executes them through the D1
+  // HTTP /query API — no DB lock, unlike `wrangler d1 execute --file`, whose
+  // bulk-import endpoint takes the live site down while it runs.
+  //
+  // ADDITIVE: INSERT OR IGNORE on the unique slug keeps existing jobs and adds
+  // only genuinely-new postings. Deletion is a separate concern handled by the
+  // delisting prune below and scripts/expire-jobs.mjs.
+  //
+  // This used to also write 40 jobs-batch-NN.sql files (~48MB per run). Nothing
+  // ever read them — they were for the `--file` path we must not use — so they
+  // were pure garbage in the working tree on every local and CI run.
   await writeFile('jobs-statements.json', JSON.stringify(stmts));
   log(`Wrote jobs-statements.json (${stmts.length} statements)`);
 
