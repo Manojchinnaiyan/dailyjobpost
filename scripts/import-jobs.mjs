@@ -11,104 +11,125 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 // ── Companies that publish via Greenhouse public boards (global hirers) ──
 const GREENHOUSE = [...new Set([
-  // ── USA — 100+ companies, heavy non-technical hiring, front-loaded ──
   // food / restaurants / grocery
-  'sweetgreen','cava','chipotle','wonder','blueapron','hellofresh','factor75','gopuff',
-  'instacart','doordash','grubhub','toasttab','olo','sennder',
+  'sweetgreen','cava','hellofresh',
+  'instacart',
   // retail / consumer brands / commerce
-  'warbyparker','glossier','allbirds','rothys','figs','everlane','reformation','away',
-  'peloton','lululemon','equinox','wayfair','thredup','poshmark','stockx','goat','mercari',
-  'offerup','faire','whatnot','etsy','chewy','overstock','thrivemarket','imperfectfoods',
+  'glossier','everlane','reformation',
+  'peloton','poshmark','stockx','mercari',
+  'offerup','faire','thrivemarket',
   // health / wellness / care
-  'oscar','cityblock','includedhealth','devoted','hims','ro','modernhealth','maven','carrot',
-  'kindbody','calm','headspace','noom','cerebral','talkspace','heydoctor','grandrounds',
-  'forwardhealth','tia','parsleyhealth','calibrate',
+  'oscar','modernhealth',
+  'calm','talkspace',
+  'tia','parsleyhealth',
   // finance / fintech / insurance
-  'sofi','chime','dave','varo','current','greenlight','creditkarma','nerdwallet','marqeta',
-  'lemonade','rootinsurance','ethoslife','policygenius','betterment','wealthfront','robinhood',
-  'brex','ramp','mercury','plaid','carta','gusto','divvy','bill','melio',
+  'sofi','chime','current','marqeta',
+  'ethoslife','betterment','robinhood',
+  'brex','mercury','carta','gusto','melio',
   // real estate / mobility / logistics
-  'compass','opendoor','bettermortgage','flexport','convoy','samsara','verkada','turo',
-  'lyft','via','getaround','gofundme','life360',
+  'flexport','samsara','verkada',
+  'lyft','via','gofundme','life360',
   // sports / entertainment / media
-  'fanatics','draftkings','fanduel','seatgeek','stubhub','gametime','reddit','pinterest',
-  'nextdoor','discord','twitch','patreon','substack','vimeo','medium','spotify',
+  'fanduel','seatgeek','reddit','pinterest',
+  'nextdoor','discord','twitch','medium',
   // education / staffing / hr
-  'coursera','udemy','chegg','duolingo','outschool','guild','handshake','varsitytutors',
-  'rippling','justworks','deel','betterup','instawork','wonolo','indeedflex','remote','oysterhr',
+  'coursera','udemy','duolingo','outschool','guild',
+  'justworks','instawork','indeedflex','remote',
   // MENA / UAE-focused
-  'careem','tabby','tamara','propertyfinder','kitopi','swvl','huspy','baraka',
-  'trukker','floward','sarwa','lean','ziina','mamo','alma','rain','cartlow',
-  'bayut','dubizzle','noon','talabat','chalhoubgroup','g42','presight',
+  'careem','tamara',
   // fintech / payments
-  'stripe','coinbase','gemini','brex','ramp','mercury','wise','gocardless','mollie',
-  'sumup','pleo','gohenry','affirm','sofi','chime','marqeta','airwallex','rho',
-  'robinhood','circle','fireblocks','chainalysis','plaid','checkout',
+  'stripe','coinbase','gemini','brex','mercury','gocardless',
+  'sumup','affirm','sofi','chime','marqeta',
+  'robinhood','fireblocks',
   // dev tools / infra / data
-  'databricks','datadog','mongodb','elastic','confluent','cockroachlabs','clickhouse',
-  'sourcegraph','retool','vercel','webflow','gitlab','hashicorp','sentry','launchdarkly',
-  'pagerduty','sumologic','grafanalabs','newrelic','timescale','redpanda','supabase',
-  'planetscale','render','dataiku','scaleai','huggingface','weightsandbiases','cohere',
+  'databricks','datadog','mongodb','elastic','cockroachlabs','clickhouse',
+  'vercel','webflow','gitlab','launchdarkly',
+  'pagerduty','sumologic','grafanalabs','newrelic',
+  'planetscale','dataiku','scaleai',
   // saas / productivity
-  'notion','coda','airtable','asana','clickup','miro','figma','canva','grammarly',
-  'calendly','dropbox','box','lattice','culture','typeform','contentful','docsend',
+  'airtable','asana','figma',
+  'calendly','dropbox','lattice','typeform','contentful',
   // consumer / social / media
-  'reddit','pinterest','nextdoor','discord','twitch','patreon','substack',
-  'bumble','strava','classpass','peloton','betterup',
+  'reddit','pinterest','nextdoor','discord','twitch',
+  'classpass','peloton',
   // delivery / mobility / logistics
-  'instacart','deliveroo','gopuff','grubhub','lyft','via','turo','getaround',
-  'samsara','verkada','flexport','convoy','project44',
+  'instacart','lyft','via',
+  'samsara','verkada','flexport','project44',
   // health / bio
-  'benchling','tempus','color','cedar','devoted','ro','swordhealth',
+  'swordhealth',
   // commerce / retail
-  'wayfair','warbyparker','allbirds','glossier','faire','whatnot','poshmark',
-  'thredup','stockx','goat','squarespace','shopify','bigcommerce',
+  'glossier','faire','poshmark',
+  'stockx','squarespace',
   // marketing / analytics
-  'attentive','klaviyo','braze','iterable','segment','amplitude','mixpanel','heap','posthog',
+  'attentive','klaviyo','braze','iterable','amplitude','mixpanel',
   // hr / ops
-  'gusto','rippling','deel','remote','justworks',
+  'gusto','remote','justworks',
   // deep tech / robotics / auto
-  'anduril','skydio','zipline','cruise','nuro','aurora',
+  'nuro',
   // europe / global
-  'getyourguide','hellofresh','celonis','personio','glovo','docplanner',
-  'employmenthero','gohighlevel','revolut','monzo','n26',
+  'getyourguide','hellofresh','celonis',
+  'monzo','n26',
   // more US tech / consumer / enterprise
-  'roblox','unity','duolingo','coursera','udemy','chegg','quizlet','khanacademy',
-  'calm','headspace','noom','hims','ro','modernhealth','springhealth','lyrahealth',
-  'creditkarma','nerdwallet','dave','varo','current','greenlight','public','m1',
-  'toast','dashlane','1password','okta','snowflake','databricks','hashicorp',
-  'gitlab','elastic','confluent','cockroachlabs','clickhouse','starburst','fivetran',
-  'airbyte','dbtlabs','hightouch','census','amplitude','heap','fullstory','contentful',
-  'sanity','algolia','meilisearch','postman','mux','twilio','vonage','bandwidth',
-  'gusto','justworks','rippling','deel','remote','oysterhr','velocityglobal',
-  'doordash','grubhub','gopuff','wonder','sweetgreen','cava','blueapron',
-  'warbyparker','glossier','rothys','figs','everlane','reformation','parade',
-  'whatnot','faire','etsy','depop','mercari','offerup','nextdoor','life360',
-  'asana','monday','smartsheet','airtable','coda','quip','loom','grain',
-  'duolingo','brilliant','outschool','varsitytutors','newsela','classdojo',
+  'roblox','duolingo','coursera','udemy','khanacademy',
+  'calm','modernhealth',
+  'current','public',
+  'toast','dashlane','okta','databricks',
+  'gitlab','elastic','cockroachlabs','clickhouse','starburst','fivetran',
+  'hightouch','amplitude','contentful',
+  'algolia','postman','twilio','vonage','bandwidth',
+  'gusto','justworks','remote',
+  'sweetgreen','cava',
+  'glossier','everlane','reformation',
+  'faire','depop','mercari','offerup','nextdoor','life360',
+  'asana','smartsheet','airtable','quip',
+  'duolingo','outschool','newsela',
   // healthcare / medicine / clinical / pharma (nurses, physicians, care, biotech)
-  'carbonhealth','onemedical','dispatchhealth','sondermind','headway','honor','papa',
-  'galileo','firefly','foldhealth','cityblock','includedhealth','devoted','oscar',
-  'tia','parsleyhealth','calibrate','foundhealth','hingehealth','omadahealth',
-  'crickethealth','strivehealth','aledade','vivanthealth','medely','trusted','incrediblehealth',
-  'benchling','recursion','tempus','color','guardanthealth','grail','flatiron','komodohealth',
-  'cohere','cohere-health','rightway','transcarent','garner','nuna','wellsky',
+  'onemedical','honor','papa',
+  'galileo','oscar',
+  'tia','parsleyhealth','omadahealth',
+  'strivehealth',
+  'komodohealth',
+  'rightway',
+  // India
+  'phonepe','inmobi','glance','stage','druva','turing','slice','postman',
+  // DACH / Germany
+  'flix','celonis','helsing','isaraerospace','parloa','solarisbank','raisin',
+  'staffbase','grover','trivago','urbansportsclub',
+  // Europe (other)
+  'tide','graphcore','truecaller','mirakl','elastic',
+  // SEA / APAC
+  'xendit','thunes','flip','kargo',
+  // Africa / MENA
+  'moniepoint','jumia','luno','ozow',
 ])];
 
 // ── Companies that publish via Lever public boards ──
 const LEVER = [...new Set([
-  'careem','tabby','noon','talabat','tamara','sarwa','swvl','propertyfinder',
-  'netflix','palantir','voiceflow','spotify','plaid','kavak','showpad',
-  'mistral','fanatics','attentivemobile','nerdwallet','brex','ramp',
-  'leadschool','swiggy','razorpay','cred','groww','meesho','sharechat',
-  'gojek','grab','traveloka','tokopedia','carousell','ninjavan',
+  'palantir','spotify','plaid','kavak',
+  'mistral',
+  'cred','meesho',
+  'ninjavan',
+  // India — Paytm alone carries a few hundred Indian postings.
+  'paytm','mindtickle','zeta','fampay','porter','fi',
+  // Europe
+  'aircall','qonto','malt','360learning','zopa','jobandtalent','swile',
+  'contentsquare','younited','omnisend','finn',
+  // APAC / LatAm / Africa
+  'nium','lalamove','coins','maya','aleph','tala','copia',
 ])];
 
 // ── Companies that publish via Ashby public boards ──
 const ASHBY = [...new Set([
-  'openai','ramp','notion','linear','vanta','hex','clay','census','replit',
-  'watershed','runwayml','elevenlabs','baseten','modal','cursor','together',
-  'perplexity-ai','sourcegraph','retool','mercury','rippling','gem','airwallex',
+  'openai','ramp','notion','linear','vanta','hex','replit',
+  'watershed','elevenlabs','baseten','modal','cursor',
+  'mercury','airwallex',
+  // India
+  'sarvam','atlan','navi','titan',
+  // DACH / Germany
+  'statista','enpal','pliant','moss','egym','clark','langdock','forto',
+  // Europe (other)
+  'doctolib','pennylane','satispay','synthesia','multiverse','marshmallow',
+  'ledger','tourlane','beamery','improbable','shift','float',
 ])];
 
 const PER_COMPANY = 55;          // cap jobs per company
@@ -133,14 +154,58 @@ const MAX_AGE_DAYS = 365;
 const MIN_BOARD_SUCCESS_RATE = 0.8;
 const MIN_LIVE_SLUGS         = 1000;
 
-// ── US location filter ──
-const NON_US = ['london','united kingdom',' uk','ireland','dublin','germany','berlin','munich','france','paris','india','bangalore','bengaluru','hyderabad','gurgaon','pune','chennai','noida','canada','toronto','vancouver','montreal','ottawa','singapore','australia','sydney','melbourne','japan','tokyo','netherlands','amsterdam','spain','madrid','barcelona','poland','warsaw','krakow','romania','bucharest','brazil','sao paulo','mexico','israel','tel aviv','china','shanghai','beijing','hong kong','emea','apac','latam','ontario','british columbia','portugal','lisbon','sweden','stockholm','denmark','copenhagen','italy','milan','switzerland','zurich','korea','seoul','philippines','manila','colombia','bogota','argentina','taiwan','vietnam','indonesia','jakarta','new zealand','auckland','dubai','uae','south africa','nigeria','kenya','egypt','turkey','istanbul'];
+// ── Region classification ────────────────────────────────────────────────────
+// Keywords mirror COUNTRY_KEYS in src/lib/jobquery.ts so a job the importer
+// files under "India" is the same job the /jobs-in/india landing page finds.
+// Order matters: the first region whose keywords match wins, and the US is
+// checked LAST because generic words like "remote" would otherwise swallow
+// "Remote - Bengaluru".
+const REGIONS = [
+  ['India',        ['india','bengaluru','bangalore','mumbai','new delhi','delhi','hyderabad','pune','chennai','kolkata','gurgaon','gurugram','noida','ahmedabad','jaipur','indore','kochi','coimbatore','chandigarh']],
+  ['Germany/DACH', ['germany','deutschland','berlin','munich','münchen','hamburg','frankfurt','cologne','köln','stuttgart','düsseldorf','leipzig','austria','vienna','wien','switzerland','zurich','zürich','geneva','basel']],
+  ['UK/Ireland',   ['united kingdom',' uk','london','manchester','edinburgh','birmingham','leeds','bristol','glasgow','cambridge','oxford','ireland','dublin','cork']],
+  ['Europe',       ['france','paris','lyon','netherlands','amsterdam','rotterdam','utrecht','spain','madrid','barcelona','valencia','italy','milan','rome','portugal','lisbon','porto','poland','warsaw','krakow','wroclaw','sweden','stockholm','denmark','copenhagen','norway','oslo','finland','helsinki','belgium','brussels','czech','prague','romania','bucharest','hungary','budapest','greece','athens','estonia','tallinn','lithuania','vilnius','latvia','riga','bulgaria','sofia','croatia','serbia','belgrade','ukraine','kyiv','emea']],
+  ['Canada',       ['canada','toronto','vancouver','montreal','ottawa','calgary','edmonton','waterloo','ontario','quebec','british columbia']],
+  ['SEA/APAC',     ['singapore','indonesia','jakarta','philippines','manila','cebu','malaysia','kuala lumpur','vietnam','hanoi','ho chi minh','thailand','bangkok','japan','tokyo','osaka','korea','seoul','china','shanghai','beijing','shenzhen','hong kong','taiwan','taipei','australia','sydney','melbourne','brisbane','perth','new zealand','auckland','apac']],
+  ['Middle East',  ['uae','dubai','abu dhabi','united arab emirates','saudi','riyadh','jeddah','qatar','doha','kuwait','bahrain','oman','israel','tel aviv','turkey','istanbul','jordan','amman','egypt','cairo']],
+  ['Africa',       ['nigeria','lagos','abuja','kenya','nairobi','south africa','johannesburg','cape town','ghana','accra','uganda','kampala','tanzania','rwanda','kigali','senegal','morocco','ethiopia']],
+  ['LatAm',        ['mexico','guadalajara','brazil','brasil','são paulo','sao paulo','rio de janeiro','argentina','buenos aires','colombia','bogota','bogotá','chile','santiago','peru','lima','uruguay','montevideo','costa rica','latam']],
+  ['United States',['united states','usa',' u.s','us-','remote - us','remote, us','remote (us','san francisco','new york','seattle','austin','los angeles','chicago','boston','denver','atlanta','washington','miami','dallas','houston','portland','san jose','mountain view','palo alto','sunnyvale','menlo park','bellevue','redwood','santa clara','san diego','san mateo','bay area','brooklyn','nyc','d.c','arlington','phoenix','philadelphia','nashville','charlotte','minneapolis','salt lake','raleigh','columbus','detroit','pittsburgh','california','texas','massachusetts','illinois','colorado','georgia','florida','oregon','virginia','arizona','utah',', ca',', ny',', wa',', tx',', ma',', il',', co',', ga',', fl',', or',', pa',', va',', nc',', az',', mn',', ut',', tn',', oh',', mi',', md',', nj',', dc',', wi',', mo',', nv']],
+];
 
-const US_MARKERS = ['united states','usa',' u.s','us-','remote','san francisco','new york','seattle','austin','los angeles','chicago','boston','denver','atlanta','washington','miami','dallas','houston','portland','san jose','mountain view','palo alto','sunnyvale','menlo park','bellevue','redwood','santa clara','san diego','san mateo','bay area','brooklyn','nyc','sf','d.c','arlington','phoenix','philadelphia','nashville','charlotte','minneapolis','salt lake','raleigh','columbus','detroit','pittsburgh','remote - us','remote, us','remote (us'];
+/** @returns one of the REGIONS names, or 'Remote/Global' when only "remote" is known. */
+function classifyRegion(location) {
+  const l = ` ${(location || '').toLowerCase()} `;
+  for (const [region, keys] of REGIONS) {
+    if (keys.some((k) => l.includes(k))) return region;
+  }
+  return /remote|anywhere|worldwide|global/.test(l) ? 'Remote/Global' : 'Other';
+}
 
-const US_STATES = [', ca',', ny',', wa',', tx',', ma',', il',', co',', ga',', fl',', or',', pa',', va',', nc',', az',', mn',', ut',', tn',', oh',', mi',', md',', nj',', dc',', wi',', mo',', in',', nv','california','new york','washington','texas','massachusetts','illinois','colorado','georgia','florida','oregon','virginia','arizona','utah'];
-
-function escapeRe(s) { return s.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+// How many of the TOTAL_CAP slots each region may claim. Without this the cap
+// is filled first-come, and since the board list is mostly American (and
+// Greenhouse is swept first) the US took ~82% of the table — India got 4%.
+// A region cannot be crowded out by another: unclaimed slots are redistributed
+// at the end, but only after every region has had its guaranteed share.
+const REGION_QUOTA = {
+  'India':          1400,
+  'Germany/DACH':    700,
+  'UK/Ireland':      600,
+  'Europe':          700,
+  'Canada':          400,
+  'SEA/APAC':        500,
+  'Middle East':     300,
+  'Africa':          200,
+  'LatAm':           200,
+  'Remote/Global':   500,
+  'Other':           300,
+  'United States':  2200,
+};
+// India must never come back empty — the site is India-facing first.
+const MIN_INDIA = 200;
+// Rows held per region beyond its quota, so leftover slots can be reallocated
+// instead of discarded. Bounded so memory stays predictable.
+const OVERFLOW_RESERVE = 400;
 
 // Global mode: accept any real location worldwide. Reject empty / junk values.
 const JUNK_LOC = /^(n\/?a|tbd|various|multiple|see job|unknown|-+)$/i;
@@ -271,6 +336,52 @@ const rows = [];
 // to reflect the whole feed, not just the subset we import.
 const liveSlugs = new Set();
 
+// ── Region-quota admission ───────────────────────────────────────────────────
+const regionCount = new Map();      // region -> rows admitted
+const overflow = new Map();         // region -> rows that did not fit its quota
+
+/**
+ * Take a row if its region still has quota left, otherwise park it in that
+ * region's overflow for possible redistribution once every board is in.
+ * @returns true when the row was admitted outright.
+ */
+function admit(row) {
+  const region = classifyRegion(row.location);
+  row.region = region;
+  const used = regionCount.get(region) ?? 0;
+  const quota = REGION_QUOTA[region] ?? 0;
+
+  if (used < quota && rows.length < TOTAL_CAP) {
+    regionCount.set(region, used + 1);
+    rows.push(row);
+    return true;
+  }
+  const spill = overflow.get(region) ?? [];
+  if (spill.length < OVERFLOW_RESERVE) {
+    spill.push(row);
+    overflow.set(region, spill);
+  }
+  return false;
+}
+
+/** Hand unclaimed slots to regions that still have candidates waiting. */
+function redistributeOverflow(log) {
+  // Non-US first: the US is the region that would otherwise absorb everything.
+  const order = [...overflow.keys()].sort((a, b) =>
+    (a === 'United States' ? 1 : 0) - (b === 'United States' ? 1 : 0));
+  let added = 0;
+  for (const region of order) {
+    for (const row of overflow.get(region) ?? []) {
+      if (rows.length >= TOTAL_CAP) break;
+      rows.push(row);
+      regionCount.set(region, (regionCount.get(region) ?? 0) + 1);
+      added++;
+    }
+    if (rows.length >= TOTAL_CAP) break;
+  }
+  if (added) log(`Redistributed ${added} spare slot(s) to regions with candidates left over`);
+}
+
 async function importGreenhouse(token) {
   const data = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs?content=true`);
   const company = company_name(token);
@@ -287,7 +398,7 @@ async function importGreenhouse(token) {
     if (textLen(body) < 120) continue;
     if (seen.has(slug)) continue;
     seen.add(slug);
-    rows.push({
+    if (admit({
       slug, title, company, location,
       type: inferType(title, location),
       remote: /remote/i.test(location) ? 1 : 0,
@@ -296,8 +407,7 @@ async function importGreenhouse(token) {
       apply_url: j.absolute_url || '',
       category: inferCategory(title),
       body,
-    });
-    count++;
+    })) count++;
   }
   return count;
 }
@@ -322,7 +432,7 @@ async function importLever(token) {
     let type = inferType(title, location);
     if (/intern/i.test(commitment)) type = 'internship';
     else if (/contract/i.test(commitment)) type = 'contract';
-    rows.push({
+    if (admit({
       slug, title, company, location,
       type,
       remote: /remote/i.test(location) ? 1 : 0,
@@ -331,8 +441,7 @@ async function importLever(token) {
       apply_url: j.hostedUrl || '',
       category: inferCategory(title),
       body,
-    });
-    count++;
+    })) count++;
   }
   return count;
 }
@@ -358,7 +467,7 @@ async function importAshby(org) {
     if (emp.includes('intern')) type = 'internship';
     else if (emp.includes('contract')) type = 'contract';
     else if (emp.includes('part')) type = 'part-time';
-    rows.push({
+    if (admit({
       slug, title, company, location,
       type,
       remote: j.isRemote || /remote/i.test(location) ? 1 : 0,
@@ -367,8 +476,7 @@ async function importAshby(org) {
       apply_url: j.jobUrl || j.applyUrl || '',
       category: inferCategory(title),
       body,
-    });
-    count++;
+    })) count++;
   }
   return count;
 }
@@ -409,7 +517,19 @@ async function main() {
   log(`\nBoards: ${boardsOk} ok, ${boardsMissing} missing (404), ${boardsErrored} errored`);
   log(`Transient health: ${(successRate * 100).toFixed(1)}% of reachable boards responded`);
   log(`Live postings seen across all feeds: ${liveSlugs.size}`);
+
+  redistributeOverflow(log);
+
   log(`Total jobs collected: ${rows.length}`);
+  log('Region mix:');
+  for (const [region, n] of [...regionCount.entries()].sort((a, b) => b[1] - a[1])) {
+    const pct = ((n / Math.max(rows.length, 1)) * 100).toFixed(1);
+    log(`  ${region.padEnd(15)} ${String(n).padStart(5)}  ${pct.padStart(5)}%  (quota ${REGION_QUOTA[region] ?? 0})`);
+  }
+  const indiaCount = regionCount.get('India') ?? 0;
+  if (indiaCount < MIN_INDIA) {
+    log(`WARNING: only ${indiaCount} India jobs this run (floor is ${MIN_INDIA}) — check the India boards above for 404s.`);
+  }
 
   const today = new Date().toISOString().slice(0, 10);
 

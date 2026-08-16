@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { runSql, transportName } from './d1.mjs';
 /**
  * Apply SQL statements to the remote D1 database.
@@ -27,25 +28,43 @@ const TOLERATE = process.argv.includes('--tolerate');
 const CHUNK_STMTS = 25;        // statements per request
 const CHUNK_CHARS = 200_000;   // stay well under the API body limit
 
-async function main() {
-  const arg = process.argv[2];
-  if (!arg) { console.error('Usage: apply-sql.mjs <statements.json> | --command "SQL"'); process.exit(1); }
-
-  let stmts;
-  if (arg === '--command') {
-    stmts = [process.argv[3]];
-  } else {
-    stmts = JSON.parse(await readFile(arg, 'utf8'));
+/**
+ * Flags may appear in any order. Reading argv[2] positionally meant
+ * `--tolerate --command "ALTER ..."` tried to open a file named "--tolerate",
+ * which failed the nightly import for six days.
+ */
+export function parseArgs(argv) {
+  const rest = argv.filter((a) => a !== '--tolerate');
+  const i = rest.indexOf('--command');
+  if (i !== -1) {
+    const sql = rest[i + 1];
+    if (!sql) throw new Error('--command needs a SQL string');
+    return { command: sql };
   }
+  if (!rest.length) throw new Error('Usage: apply-sql.mjs <statements.json> | --command "SQL"');
+  return { file: rest[0] };
+}
+
+async function main() {
+  let parsed;
+  try { parsed = parseArgs(process.argv.slice(2)); }
+  catch (e) { console.error(e.message); process.exit(1); }
+
+  const stmts = parsed.command
+    ? [parsed.command]
+    : JSON.parse(await readFile(parsed.file, 'utf8'));
   if (!stmts.length) { console.log('No statements to apply.'); return; }
   console.log(`Applying ${stmts.length} statement(s) via ${transportName}`);
 
-  let applied = 0, chunk = [], chars = 0;
+  let applied = 0, tolerated = 0, chunk = [], chars = 0;
   const flush = async () => {
     if (!chunk.length) return;
-    await runSql(chunk.join('\n'), { tolerate: TOLERATE });
-    applied += chunk.length;
-    console.log(`Applied ${applied}/${stmts.length}`);
+    const result = await runSql(chunk.join('\n'), { tolerate: TOLERATE });
+    // runSql returns null when a tolerated statement failed — do not report
+    // those as applied, or an ALTER that silently no-ops looks like it ran.
+    if (result === null) tolerated += chunk.length;
+    else applied += chunk.length;
+    console.log(`Applied ${applied}/${stmts.length}${tolerated ? ` (${tolerated} tolerated)` : ''}`);
     chunk = []; chars = 0;
   };
   for (const s of stmts) {
@@ -53,7 +72,10 @@ async function main() {
     chunk.push(s); chars += s.length;
   }
   await flush();
-  console.log(`Done: ${applied} statements applied.`);
+  console.log(`Done: ${applied} statement(s) applied${tolerated ? `, ${tolerated} tolerated` : ""}.`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Only run when executed directly, so parseArgs can be imported by tests.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
