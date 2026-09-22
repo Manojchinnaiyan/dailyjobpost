@@ -124,21 +124,10 @@ export interface LandingIndex {
   cities: { name: string; slug: string; countrySlug: string; count: number }[];
 }
 
-interface DBLike { prepare(q: string): { all<T>(): Promise<{ results: T[] }> } }
-interface Row { location: string; category: string; title: string }
+export interface LandingRow { location: string; category: string; title: string }
 
-// One full scan, cached per isolate — same as homestats. Powers the sitemap and
-// the cross-links between landing pages without N queries.
-let cache: { at: number; data: LandingIndex } | null = null;
-const TTL_MS = 30 * 60 * 1000;
-
-export async function getLandingIndex(db: DBLike): Promise<LandingIndex> {
-  const now = Date.now();
-  if (cache && now - cache.at < TTL_MS) return cache.data;
-
-  const res = await db.prepare('SELECT location, category, title FROM jobs').all<Row>();
-  const rows = res.results ?? [];
-
+/** Landing-page counts from one pass over every job. Callers go through getSiteStats. */
+export function computeLandingIndex(rows: LandingRow[]): LandingIndex {
   const catCount: Record<string, number> = {};
   const ctyCount: Record<string, number> = {};
   const comboCount: Record<string, number> = {};
@@ -197,7 +186,5 @@ export async function getLandingIndex(db: DBLike): Promise<LandingIndex> {
     .map((c) => ({ name: c.name, slug: c.slug, countrySlug: c.countrySlug, count: cityCount[`${c.countrySlug}/${c.slug}`] || 0 }))
     .filter((c) => c.count >= 3);
 
-  const data: LandingIndex = { categories, countries, combos, roles, cities };
-  cache = { at: now, data };
-  return data;
+  return { categories, countries, combos, roles, cities };
 }

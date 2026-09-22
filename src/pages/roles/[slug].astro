@@ -4,7 +4,8 @@ import Base from '../../layouts/Base.astro';
 import Footer from '../../components/Footer.astro';
 import JobResults from '../../components/JobResults.astro';
 import { queryJobs, filtersFromUrl } from '../../lib/jobquery';
-import { ROLE_BY_SLUG, getLandingIndex } from '../../lib/landing';
+import { getSiteStats, precomputedTotal } from '../../lib/sitestats';
+import { ROLE_BY_SLUG } from '../../lib/landing';
 
 const { slug } = Astro.params;
 const role = ROLE_BY_SLUG[slug ?? ''];
@@ -13,9 +14,10 @@ if (!role) return Astro.redirect('/');
 const { env } = Astro.locals.runtime;
 const filters = filtersFromUrl(Astro.url);
 filters.q = filters.q || role.q;
-const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+const stats = await getSiteStats(env.DB);
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters, { total: precomputedTotal(stats, filters) });
 
-const index = await getLandingIndex(env.DB);
+const index = stats.landing;
 const otherRoles = index.roles.filter((r) => r.slug !== slug).slice(0, 14);
 
 const base = 'https://dailyjobpost.online';

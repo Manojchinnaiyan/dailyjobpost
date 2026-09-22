@@ -4,21 +4,23 @@ import Base from '../layouts/Base.astro';
 import Footer from '../components/Footer.astro';
 import JobResults from '../components/JobResults.astro';
 import { queryJobs, filtersFromUrl, pageHref } from '../lib/jobquery';
-import { getHomeStats, CATEGORIES, COUNTRY_META } from '../lib/homestats';
-import { CATEGORY_SLUG, COUNTRY_SLUG, getLandingIndex } from '../lib/landing';
+import { CATEGORIES, COUNTRY_META } from '../lib/homestats';
+import { CATEGORY_SLUG, COUNTRY_SLUG } from '../lib/landing';
+import { getSiteStats, precomputedTotal } from '../lib/sitestats';
 import { AD_CLIENT, AD_SLOTS } from '../lib/ads';
 
 const { env } = Astro.locals.runtime;
 const filters = filtersFromUrl(Astro.url);
 
+// Browse counts — one precomputed row, rebuilt daily (src/lib/sitestats.ts)
+const stats = await getSiteStats(env.DB);
+const { grandTotal, remoteCount, newThisWeek, categoryStats, countryStats } = stats.home;
+
 // Page of results (filtered + paginated, no body shipped to client)
-const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters, { total: precomputedTotal(stats, filters) });
 
-// Browse counts — cached in-memory (recomputed at most once per 10 min)
-const { grandTotal, remoteCount, newThisWeek, categoryStats, countryStats } = await getHomeStats(env.DB);
-
-// Popular roles for the "browse by role" SEO links (cached single-scan index).
-const topRoles = (await getLandingIndex(env.DB)).roles.slice(0, 18);
+// Popular roles for the "browse by role" SEO links.
+const topRoles = stats.landing.roles.slice(0, 18);
 
 const POSTED_LABELS: Record<string, string> = { '1': 'past 24 hours', '3': 'past 3 days', '7': 'past week', '14': 'past 2 weeks', '30': 'past month' };
 const hasFilter = !!(filters.q || filters.type || filters.category || filters.country || filters.posted);

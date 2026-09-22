@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { GUIDES } from '../lib/guides';
-import { getLandingIndex } from '../lib/landing';
+import { getLandingIndex } from '../lib/sitestats';
 
 interface JobSlugRow { slug: string; posted: string; }
 

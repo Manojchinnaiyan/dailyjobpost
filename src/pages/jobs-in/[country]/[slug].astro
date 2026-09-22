@@ -4,7 +4,8 @@ import Base from '../../../layouts/Base.astro';
 import Footer from '../../../components/Footer.astro';
 import JobResults from '../../../components/JobResults.astro';
 import { queryJobs, filtersFromUrl } from '../../../lib/jobquery';
-import { countryName, categoryName, findCity, getLandingIndex } from '../../../lib/landing';
+import { getSiteStats, precomputedTotal } from '../../../lib/sitestats';
+import { countryName, categoryName, findCity } from '../../../lib/landing';
 
 const { country, slug } = Astro.params;
 const cname = countryName(country ?? '');
@@ -22,10 +23,11 @@ let heading: string;
 if (catname) { filters.category = catname; heading = `${catname} Jobs in ${cname}`; }
 else { filters.locationKeys = city!.keys; filters.country = undefined; heading = `Jobs in ${city!.name}`; }
 
-const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+const stats = await getSiteStats(env.DB);
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters, { total: precomputedTotal(stats, filters) });
 if (total === 0) return Astro.redirect(`/jobs-in/${country}`, 302);
 
-const index = await getLandingIndex(env.DB);
+const index = stats.landing;
 const more = catname
   ? index.combos.filter((c) => c.countryName === cname && c.categoryName !== catname).slice(0, 12)
       .map((c) => ({ href: `/jobs-in/${country}/${c.categorySlug}`, label: `${c.categoryName} jobs in ${cname}`, n: c.count }))

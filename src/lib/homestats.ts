@@ -34,24 +34,10 @@ export interface HomeStats {
   countryStats: { name: string; flag: string; count: number }[];
 }
 
-interface DBLike {
-  prepare(q: string): { all<T>(): Promise<{ results: T[] }> };
-}
+export interface MetaRow { type: string; remote: number; posted: string; location: string; category: string }
 
-interface MetaRow { type: string; remote: number; posted: string; location: string; category: string }
-
-// In-memory, per-isolate cache. Browse counts are the same for every visitor,
-// so we recompute at most once per TTL instead of scanning all rows per request.
-let cache: { at: number; data: HomeStats } | null = null;
-const TTL_MS = 10 * 60 * 1000;
-
-export async function getHomeStats(db: DBLike): Promise<HomeStats> {
-  const now = Date.now();
-  if (cache && now - cache.at < TTL_MS) return cache.data;
-
-  const res = await db.prepare('SELECT type, remote, posted, location, category FROM jobs').all<MetaRow>();
-  const meta = res.results ?? [];
-
+/** Browse counts from one pass over every job. Callers go through getSiteStats. */
+export function computeHomeStats(meta: MetaRow[], now: number): HomeStats {
   const grandTotal = meta.length;
   const remoteCount = meta.filter(j => j.remote || j.type === 'remote').length;
   const weekAgo = new Date(now - 7 * 86_400_000).toISOString().split('T')[0];
@@ -71,7 +57,5 @@ export async function getHomeStats(db: DBLike): Promise<HomeStats> {
     return { ...c, count };
   }).filter(c => c.count > 0);
 
-  const data: HomeStats = { grandTotal, remoteCount, newThisWeek, categoryStats, countryStats };
-  cache = { at: now, data };
-  return data;
+  return { grandTotal, remoteCount, newThisWeek, categoryStats, countryStats };
 }

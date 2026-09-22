@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { SESSION_COOKIE, getSession } from '../../../lib/auth';
 import { toSlug } from '../../../lib/db';
+import { invalidateSiteStats } from '../../../lib/sitestats';
 
 export const prerender = false;
 
@@ -45,6 +46,7 @@ export const POST: APIRoute = async ({ locals, cookies, request, redirect }) => 
     `INSERT INTO jobs (slug, title, company, location, type, remote, urgent, salary, tags, posted, apply_url, experience, category, body)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(slug, title, company, location, type, remote, urgent, salary, tags, posted, applyUrl, experience, category, body).run();
+  await invalidateSiteStats(db);
 
   return redirect('/admin/dashboard');
 };

@@ -3,7 +3,8 @@ import { rowToJob, type Job, type JobRow } from './db';
 export const PAGE_SIZE = 24;
 
 /** Columns for listing pages — everything except the heavy `body`. */
-const LIST_COLS = 'id,slug,title,company,location,type,remote,urgent,salary,tags,posted,apply_url,experience,category';
+const LIST_COLS = ['id','slug','title','company','location','type','remote','urgent','salary','tags','posted','apply_url','experience','category']
+  .map((c) => `jobs.${c}`).join(',');
 
 export interface JobFilters {
   q?: string;
@@ -42,73 +43,65 @@ export const COUNTRY_KEYS: Record<string, string[]> = {
 
 const TYPE_VALUES = ['full-time','part-time','contract','internship'];
 
-// Fields searched, with their relevance weight (higher = more important).
-const SEARCH_FIELDS: [string, number][] = [
-  ['title', 12], ['tags', 6], ['company', 5], ['category', 4], ['location', 3], ['body', 1],
-];
+// Relevance weight per jobs_fts column, in declaration order
+// (title, tags, company, category, location, body) — higher = more important.
+const BM25_WEIGHTS = '12.0, 6.0, 5.0, 4.0, 3.0, 1.0';
 
-/** Split a query into up to 6 clean lowercase terms. */
-function queryTerms(q: string): string[] {
-  return q.toLowerCase().replace(/[%_]/g, ' ').split(/\s+/).map(t => t.trim()).filter(Boolean).slice(0, 6);
+/**
+ * Turn free text into an FTS5 MATCH expression: up to 6 prefix terms, all
+ * required. Split on the same characters the jobs_fts tokenizer splits on
+ * ('+' and '#' are kept, for "c++" / "c#"), and quote each term so user input
+ * can never be parsed as FTS5 syntax (AND, NEAR, column filters, ...).
+ */
+export function ftsQuery(q: string): string {
+  return q.toLowerCase()
+    .split(/[^\p{L}\p{N}+#]+/u)
+    .filter((t) => /[\p{L}\p{N}]/u.test(t))
+    .slice(0, 6)
+    .map((t) => `"${t}"*`)
+    .join(' ');
 }
 
-interface WhereResult { sql: string; binds: (string | number)[]; scoreSql: string; scoreBinds: (string | number)[] }
+interface WhereResult { sql: string; binds: (string | number)[]; match: string }
 
-/** Build WHERE + a relevance-score expression from filters. */
+/**
+ * Build the WHERE clause from filters. A search becomes an FTS5 MATCH
+ * (`match`), which the caller joins in; every other column is qualified with
+ * `jobs.` because jobs_fts shares some column names.
+ */
 export function buildWhere(f: JobFilters): WhereResult {
   const where: string[] = [];
   const binds: (string | number)[] = [];
-  let scoreSql = '0';
-  const scoreBinds: (string | number)[] = [];
 
-  const terms = f.q && f.q.trim() ? queryTerms(f.q) : [];
-  if (terms.length) {
-    // Each term must appear in at least one field (AND across terms, OR across fields).
-    for (const t of terms) {
-      const like = `%${t}%`;
-      where.push('(' + SEARCH_FIELDS.map(([c]) => `lower(${c}) LIKE ?`).join(' OR ') + ')');
-      SEARCH_FIELDS.forEach(() => binds.push(like));
-    }
-    // Relevance: weighted field hits per term + a bonus when the title starts with a term.
-    const parts: string[] = [];
-    for (const t of terms) {
-      const like = `%${t}%`;
-      for (const [c, w] of SEARCH_FIELDS) {
-        parts.push(`(CASE WHEN lower(${c}) LIKE ? THEN ${w} ELSE 0 END)`);
-        scoreBinds.push(like);
-      }
-      parts.push('(CASE WHEN lower(title) LIKE ? THEN 8 ELSE 0 END)');
-      scoreBinds.push(`${t}%`);
-    }
-    scoreSql = parts.join(' + ');
-  }
+  const match = f.q && f.q.trim() ? ftsQuery(f.q) : '';
+  if (match) { where.push('jobs_fts MATCH ?'); binds.push(match); }
 
   if (f.type) {
-    if (f.type === 'remote') where.push("(remote = 1 OR type = 'remote')");
-    else if (f.type === 'urgent') where.push('urgent = 1');
-    else if (TYPE_VALUES.includes(f.type)) { where.push('type = ?'); binds.push(f.type); }
+    if (f.type === 'remote') where.push("(jobs.remote = 1 OR jobs.type = 'remote')");
+    else if (f.type === 'urgent') where.push('jobs.urgent = 1');
+    else if (TYPE_VALUES.includes(f.type)) { where.push('jobs.type = ?'); binds.push(f.type); }
   }
-  if (f.category) { where.push('category = ?'); binds.push(f.category); }
+  if (f.category) { where.push('jobs.category = ?'); binds.push(f.category); }
   if (f.posted && POSTED_DAYS.has(f.posted)) {
-    where.push("posted >= date('now', ?)");
+    where.push("jobs.posted >= date('now', ?)");
     binds.push(`-${f.posted} days`);
   }
   if (f.country) {
-    if (f.country === 'Remote') where.push("(remote = 1 OR type = 'remote')");
+    if (f.country === 'Remote') where.push("(jobs.remote = 1 OR jobs.type = 'remote')");
     else {
       const keys = COUNTRY_KEYS[f.country];
       if (keys?.length) {
-        where.push('(' + keys.map(() => 'lower(location) LIKE ?').join(' OR ') + ')');
+        where.push('(' + keys.map(() => 'lower(jobs.location) LIKE ?').join(' OR ') + ')');
         keys.forEach(k => binds.push(`%${k.toLowerCase()}%`));
       }
     }
   }
   if (f.locationKeys?.length) {
-    where.push('(' + f.locationKeys.map(() => 'lower(location) LIKE ?').join(' OR ') + ')');
+    where.push('(' + f.locationKeys.map(() => 'lower(jobs.location) LIKE ?').join(' OR ') + ')');
     f.locationKeys.forEach(k => binds.push(`%${k.toLowerCase()}%`));
   }
 
-  return { sql: where.length ? 'WHERE ' + where.join(' AND ') : '', binds, scoreSql, scoreBinds };
+  return { sql: where.length ? 'WHERE ' + where.join(' AND ') : '', binds, match };
 }
 
 interface DBLike {
@@ -117,25 +110,34 @@ interface DBLike {
   };
 }
 
-/** Run a paginated, filtered query. Returns the page of jobs + total count. */
-export async function queryJobs(db: DBLike, f: JobFilters): Promise<{ jobs: Job[]; total: number; page: number; pages: number }> {
-  const { sql, binds, scoreSql, scoreBinds } = buildWhere(f);
-  const hasQ = !!(f.q && f.q.trim());
+/**
+ * Run a paginated, filtered query. Returns the page of jobs + total count.
+ * Pass `total` when it is already known (see precomputedTotal) to skip the
+ * COUNT(*), which on location filters scans the whole table.
+ */
+export async function queryJobs(
+  db: DBLike, f: JobFilters, opts: { total?: number } = {},
+): Promise<{ jobs: Job[]; total: number; page: number; pages: number }> {
+  const { sql, binds, match } = buildWhere(f);
+  const from = match ? 'jobs_fts JOIN jobs ON jobs.id = jobs_fts.rowid' : 'jobs';
   const page = Math.max(1, f.page || 1);
 
-  const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM jobs ${sql}`).bind(...binds).first<{ c: number }>();
-  const total = countRow?.c ?? 0;
+  let total = opts.total;
+  if (total === undefined) {
+    const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM ${from} ${sql}`).bind(...binds).first<{ c: number }>();
+    total = countRow?.c ?? 0;
+  }
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const offset = (Math.min(page, pages) - 1) * PAGE_SIZE;
 
-  // When searching, rank by relevance score then recency; otherwise newest first.
-  const select = hasQ ? `${LIST_COLS}, (${scoreSql}) AS _score` : LIST_COLS;
-  const order  = hasQ ? '_score DESC, posted DESC, created_at DESC' : 'posted DESC, created_at DESC';
-  const pageBinds = hasQ ? [...scoreBinds, ...binds, PAGE_SIZE, offset] : [...binds, PAGE_SIZE, offset];
+  // When searching, rank by relevance (bm25: lower is better) then recency; otherwise newest first.
+  const order = match
+    ? `bm25(jobs_fts, ${BM25_WEIGHTS}), jobs.posted DESC, jobs.created_at DESC`
+    : 'jobs.posted DESC, jobs.created_at DESC';
 
   const res = await db
-    .prepare(`SELECT ${select} FROM jobs ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`)
-    .bind(...pageBinds)
+    .prepare(`SELECT ${LIST_COLS} FROM ${from} ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`)
+    .bind(...binds, PAGE_SIZE, offset)
     .all<JobRow>();
 
   return { jobs: (res.results ?? []).map(rowToJob), total, page: Math.min(page, pages), pages };

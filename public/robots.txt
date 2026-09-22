@@ -2,46 +2,103 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
+# Free-text search results: unbounded URLs, each a full-text query.
+Disallow: /*?q=
+Disallow: /*&q=
 
 # Explicitly welcome AI / LLM crawlers so our listings and guides can be
 # surfaced and cited in ChatGPT, Claude, Perplexity, Gemini, etc.
+# A crawler obeys only its most specific group, so each group repeats the
+# Disallow rules above — without them these bots would crawl search URLs.
 User-agent: GPTBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: OAI-SearchBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: anthropic-ai
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: Claude-Web
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: PerplexityBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: Perplexity-User
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: Google-Extended
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: Applebot-Extended
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: Amazonbot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: CCBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 User-agent: Meta-ExternalAgent
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*?q=
+Disallow: /*&q=
 
 Sitemap: https://dailyjobpost.online/sitemap.xml

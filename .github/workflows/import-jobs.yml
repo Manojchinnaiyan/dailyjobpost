@@ -84,6 +84,18 @@ jobs:
       - name: Verify suspect jobs by fetching their apply URL
         run: node scripts/expire-jobs.mjs
 
+      # Pages read browse counts from one precomputed site_stats row instead of
+      # scanning every job (src/lib/sitestats.ts). Drop it now that the jobs
+      # have changed, then load the homepage so it is rebuilt straight away
+      # rather than by the first visitor (the unique query string skips the
+      # edge cache). Runs even if a step above failed, since a partial import
+      # still changed the counts.
+      - name: Refresh precomputed site stats
+        if: always()
+        run: |
+          node scripts/apply-sql.mjs --command "DELETE FROM site_stats;"
+          curl -fsS -o /dev/null "https://dailyjobpost.online/?stats-refresh=$(date +%s)" || echo "Warm-up request failed; the first visitor will rebuild the stats."
+
       # Fast indexing: notify search engines of new jobs + landing pages.
       # IndexNow (Bing/Yandex) needs no auth; Google no-ops until GOOGLE_INDEXING_SA is set.
       - name: Ping IndexNow (Bing/Yandex)

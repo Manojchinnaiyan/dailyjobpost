@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { SESSION_COOKIE, getSession } from '../../../lib/auth';
+import { invalidateSiteStats } from '../../../lib/sitestats';
 
 export const prerender = false;
 
@@ -20,6 +21,7 @@ export const POST: APIRoute = async ({ locals, cookies, request, params, redirec
 
   if (method === 'DELETE') {
     await db.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run();
+    await invalidateSiteStats(db);
     return redirect('/admin/dashboard');
   }
 
@@ -48,6 +50,7 @@ export const POST: APIRoute = async ({ locals, cookies, request, params, redirec
     `UPDATE jobs SET title=?, company=?, location=?, type=?, remote=?, urgent=?, salary=?, tags=?, posted=?, apply_url=?, experience=?, category=?, body=?
      WHERE id=?`
   ).bind(title, company, location, type, remote, urgent, salary, tags, posted, applyUrl, experience, category, body, id).run();
+  await invalidateSiteStats(db);
 
   return redirect('/admin/dashboard');
 };

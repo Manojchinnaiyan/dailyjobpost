@@ -4,7 +4,8 @@ import Base from '../../layouts/Base.astro';
 import Footer from '../../components/Footer.astro';
 import JobResults from '../../components/JobResults.astro';
 import { queryJobs, filtersFromUrl } from '../../lib/jobquery';
-import { countryName, getLandingIndex } from '../../lib/landing';
+import { getSiteStats, precomputedTotal } from '../../lib/sitestats';
+import { countryName } from '../../lib/landing';
 
 const { slug } = Astro.params;
 const name = countryName(slug ?? '');
@@ -14,9 +15,10 @@ const { env } = Astro.locals.runtime;
 const filters = filtersFromUrl(Astro.url);
 filters.country = name;
 filters.category = undefined;
-const { jobs, total, page, pages } = await queryJobs(env.DB, filters);
+const stats = await getSiteStats(env.DB);
+const { jobs, total, page, pages } = await queryJobs(env.DB, filters, { total: precomputedTotal(stats, filters) });
 
-const index = await getLandingIndex(env.DB);
+const index = stats.landing;
 const cats = index.combos.filter((c) => c.countryName === name).slice(0, 14);
 const cities = index.cities.filter((c) => c.countrySlug === slug).slice(0, 14);
 const otherCountries = index.countries.filter((c) => c.name !== name).slice(0, 12);
